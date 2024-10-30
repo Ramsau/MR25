@@ -1,3 +1,31 @@
+<<<<<<< HEAD
+## Setting up ROS2
+
+- System requirements: Ubuntu 22.04
+- Install ROS2 Humble as described in the [Installation Guide](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html). Install the full desktop version (`ros-humble-desktop-full`).
+- Export the following variables
+  - `ROS_LOCALHOST_ONLY=1`
+  - `ROS_DOMAIN_ID=0`
+
+## Setting up the workspace
+
+- Create a new worspace folder
+  - `mkdir -p ~/ros2_ws/src`
+  - `cd ~/ros2_ws`
+- Build the workspace
+  - `colcon build`
+- Source the workspace
+  - `source install/local_setup.bash`
+
+## Setting up the assignment repository
+
+- Clone this repository
+- Link the packages to your workspace
+  - `ln -s PATH/TO/CLONED/REPO/tug_stage_ros2 ~/ros2_ws/src`
+  - ...
+- Build the workspace
+- Source the workspace
+=======
 # Mr2 Public
 
 
@@ -91,3 +119,4 @@ For open source projects, say how it is licensed.
 
 ## Project status
 If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+>>>>>>> 9157f8d5feef26e445f727b53900abe7992f54b5
