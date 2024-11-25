@@ -1,0 +1,46 @@
+# Clock topic
+- topic_name: "/clock"
+  gz_type_name: "ignition.msgs.Clock"
+  ros_type_name: "rosgraph_msgs/msg/Clock"
+  direction: "GZ_TO_ROS"
+
+# Joint states topic
+- gz_topic_name: "/model/tug_turtlebot4/joint_states"
+  ros_topic_name: "joint_states"
+  gz_type_name: "ignition.msgs.Model"
+  ros_type_name: "sensor_msgs/msg/JointState"
+  direction: "GZ_TO_ROS"
+
+# Command velocity topic
+- gz_topic_name: "/model/tug_turtlebot4/cmd_vel"
+  ros_topic_name: "cmd_vel"
+  gz_type_name: "ignition.msgs.Twist"
+  ros_type_name: "geometry_msgs/msg/Twist"
+  direction: "ROS_TO_GZ"
+
+# TF topic
+# - gz_topic_name: "/model/tug_turtlebot4/tf"
+#   ros_topic_name: "tf"
+#   gz_type_name: "ignition.msgs.Pose_V"
+#   ros_type_name: "tf2_msgs/msg/TFMessage"
+#   direction: "GZ_TO_ROS"
+
+# Lidar
+- gz_topic_name: "/model/tug_turtlebot4/scan"
+  ros_topic_name: "scan"
+  gz_type_name: "ignition.msgs.LaserScan"
+  ros_type_name: "sensor_msgs/msg/LaserScan"
+  direction: "GZ_TO_ROS"
+
+# Ground truth
+- gz_topic_name: "/model/tug_turtlebot4/pose"
+  ros_topic_name: "tf"
+  gz_type_name: "ignition.msgs.Pose_V"
+  ros_type_name: "tf2_msgs/msg/TFMessage"
+  direction: "GZ_TO_ROS"
+
+- gz_topic_name: "/model/tug_turtlebot4/pose"
+  ros_topic_name: "pose"
+  gz_type_name: "ignition.msgs.Pose_V"
+  ros_type_name: "geometry_msgs/msg/PoseArray"
+  direction: "GZ_TO_ROS"

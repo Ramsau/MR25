@@ -1,0 +1,9 @@
+tug_turtlebot4:
+  static_transform_publisher:
+    ros__parameters:
+      from:
+        - "odom"
+        - "tug_turtlebot4"
+      to:
+        - "columns"
+        - "base_link"

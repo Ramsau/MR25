@@ -14,6 +14,7 @@ rosidl_generate_interfaces(
     "msg/Bicycle.msg"
     "msg/Movement.msg"
     "msg/RobotPose.msg"
+    "msg/WheelEncoder.msg"
 )
 
 if(BUILD_TESTING)
