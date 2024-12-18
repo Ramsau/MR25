@@ -3,15 +3,21 @@
 
 <launch>
   <!-- Launch arguments -->
+  <arg name="world" default="columns" />
   <arg name="rviz" default="false" />
   <arg name="namespace" default="tug_turtlebot4" />
 
   <!-- Gazebo -->
-  <group>
-    <set_env name="IGN_GAZEBO_RESOURCE_PATH" value="/opt/ros/$(env ROS_DISTRO)/share" />
-    <set_env name="IGN_GAZEBO_SYSTEM_PLUGIN_PATH" value="/opt/ros/$(env ROS_DISTRO)/lib:$(find-pkg-prefix tug_turtlebot4)/lib/tug_turtlebot4" />
-    <executable cmd="ign gazebo $(find-pkg-share tug_turtlebot4)/worlds/columns.sdf -v3" name="Gazebo" output="screen" />
-  </group>
+  <executable cmd="ign gazebo $(var world).sdf -v3" name="Gazebo" output="screen">
+    <env
+      name="IGN_GAZEBO_RESOURCE_PATH"
+      value="/opt/ros/$(env ROS_DISTRO)/share:$(find-pkg-share tug_turtlebot4)/worlds:$(find-pkg-share turtlebot4_ignition_bringup)/worlds"
+    />
+    <env
+      name="IGN_GAZEBO_SYSTEM_PLUGIN_PATH"
+      value="/opt/ros/$(env ROS_DISTRO)/lib:$(find-pkg-prefix tug_turtlebot4)/lib/tug_turtlebot4"
+    />
+  </executable>
 
   <!-- ROS Gazebo bridge -->
   <node pkg="ros_gz_bridge" exec="parameter_bridge" namespace="$(var namespace)" output="screen">

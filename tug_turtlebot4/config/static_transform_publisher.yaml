@@ -3,7 +3,9 @@ tug_turtlebot4:
     ros__parameters:
       from:
         - "odom"
+        - "odom"
         - "tug_turtlebot4"
       to:
         - "columns"
+        - "maze"
         - "base_link"

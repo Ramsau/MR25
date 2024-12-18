@@ -11,10 +11,14 @@ find_package(rclcpp REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 
+# find message dependencies
 find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(tug_msgs REQUIRED)
 
+#find ignition dependencies
 find_package(ignition-gazebo6 REQUIRED)
 find_package(ignition-plugin1 REQUIRED)
 
@@ -43,6 +47,20 @@ ament_target_dependencies(
     tug_msgs
 )
 
+add_executable(slam "src/slam.cpp" "src/SlamNode.cpp" "src/OccupancyGridMap.cpp")
+target_compile_features(slam PUBLIC cxx_std_17)
+target_include_directories(slam PUBLIC "include/")
+ament_target_dependencies(
+  slam
+    rclcpp
+    tf2
+    tf2_ros
+    geometry_msgs
+    nav_msgs
+    sensor_msgs
+    tf2_geometry_msgs
+)
+
 add_executable(static_transform_publisher "src/static_transform_publisher.cpp")
 target_compile_features(static_transform_publisher PUBLIC cxx_std_17)
 target_include_directories(static_transform_publisher PUBLIC "include/")
@@ -58,6 +76,7 @@ install(
   TARGETS
     tug_wheel_encoder-system
     simple_turtle
+    slam
     static_transform_publisher
   DESTINATION lib/${PROJECT_NAME}
 )
