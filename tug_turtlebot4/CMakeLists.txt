@@ -34,6 +34,16 @@ target_link_libraries(
 ament_target_dependencies(tug_wheel_encoder-system rclcpp tug_msgs)
 
 # add nodes
+add_executable(nav "src/nav.cpp" "src/NavNode.cpp")
+target_compile_features(nav PUBLIC cxx_std_17)
+target_include_directories(nav PUBLIC "include/")
+ament_target_dependencies(
+  nav
+    rclcpp
+    geometry_msgs
+    sensor_msgs
+)
+
 add_executable(simple_turtle "src/simple_turtle.cpp" "src/SimpleTurtleNode.cpp")
 target_compile_features(simple_turtle PUBLIC cxx_std_17)
 target_include_directories(simple_turtle PUBLIC "include/")
@@ -75,6 +85,7 @@ ament_target_dependencies(
 install(
   TARGETS
     tug_wheel_encoder-system
+    nav
     simple_turtle
     slam
     static_transform_publisher

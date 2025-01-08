@@ -5,6 +5,7 @@
   <!-- Launch arguments -->
   <arg name="world" default="columns" />
   <arg name="rviz" default="false" />
+  <arg name="robot" default="tug_turtlebot4" />
   <arg name="namespace" default="tug_turtlebot4" />
 
   <!-- Gazebo -->
@@ -28,7 +29,7 @@
   <!-- Robot state publisher -->
   <node pkg="robot_state_publisher" exec="robot_state_publisher" namespace="$(var namespace)" output="screen">
     <param name="use_sim_time" value="true" />
-    <param name="robot_description" value="$(command 'cat $(find-pkg-share tug_turtlebot4)/urdf/tug_turtlebot4.urdf')" />
+    <param name="robot_description" value="$(command 'cat $(find-pkg-share tug_turtlebot4)/urdf/$(var robot).urdf')" />
 
     <remap from="/tf" to="tf" />
     <remap from="/tf_static" to="tf_static" />
@@ -51,6 +52,7 @@
   <node pkg="rviz2" exec="rviz2" namespace="$(var namespace)" args="-d $(find-pkg-share tug_turtlebot4)/rviz/config.rviz" output="screen" if="$(var rviz)">
     <param name="use_sim_time" value="true" />
 
+    <remap from="/goal_pose" to="goal_pose" />
     <remap from="/tf" to="tf" />
     <remap from="/tf_static" to="tf_static" />
   </node> 

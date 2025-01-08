@@ -196,7 +196,7 @@
   <link name="right_wheel">
     <visual>
       <geometry>
-        <cylinder length="0.015" radius="0.0355"/>
+        <cylinder length="0.015" radius="0.03575"/>
       </geometry>
       <!-- Give black color to wheels in Rviz -->
       <material name="black">
@@ -205,7 +205,7 @@
     </visual>
     <collision>
       <geometry>
-        <cylinder length="0.015" radius="0.0355"/>
+        <cylinder length="0.015" radius="0.03575"/>
       </geometry>
     </collision>
     <inertial>
@@ -866,11 +866,6 @@
       <max_angular_velocity>1.9</max_angular_velocity>
       <min_angular_acceleration>-7.725</min_angular_acceleration>
       <max_angular_acceleration>7.725</max_angular_acceleration>
-    </plugin>
-
-    <plugin filename="libtug_wheel_encoder-system.so" name="tug_turtlebot4::ign_plugin::WheelEncoder">
-      <left_joint>left_wheel_joint</left_joint>
-      <right_joint>right_wheel_joint</right_joint>
     </plugin>
   </gazebo>
 
