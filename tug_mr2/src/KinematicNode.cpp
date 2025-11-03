@@ -60,6 +60,14 @@ void KinematicNode::movementCallback(const Movement::ConstSharedPtr& msg)
 
   // TODO: Compute the robot's position and heading
   //       Push the calculated values to the robot_pose_msgs_ vector
+  for (int i = 0; i < 100; i++) {
+    const static float a = 5;
+    const static float b = 4;
+    auto pose = RobotPose();
+    pose.set__x(a * sin(i));
+    pose.set__y(b * sin(2 * i));
+    robot_pose_msgs_.push_back(pose);
+  }
 
   cmd_vel_msgs_.clear();
 
@@ -71,6 +79,7 @@ void KinematicNode::movementCallback(const Movement::ConstSharedPtr& msg)
   // TODO: Compute the robot's translational velocity and steering angle
   //       Push the calculated values to the bicycle_msgs_ vector
 
+  step_count_++;
 }
 
 // -----------------------------------------------------------------------------
