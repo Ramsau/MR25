@@ -60,12 +60,20 @@ void KinematicNode::movementCallback(const Movement::ConstSharedPtr& msg)
 
   // TODO: Compute the robot's position and heading
   //       Push the calculated values to the robot_pose_msgs_ vector
-  for (int i = 0; i < 100; i++) {
-    const static float a = 5;
-    const static float b = 4;
+
+  float a = 5;
+  float b = 4;
+  float path_time = 30.0;
+  float command_freq = 20.0;
+  int num_commands = path_time * command_freq;
+  float pi = 3.14159265358979323846;
+  for (int i = 0; i < num_commands; i++) {
     auto pose = RobotPose();
-    pose.set__x(a * sin(i));
-    pose.set__y(b * sin(2 * i));
+    float t = static_cast<float>(i) / static_cast<float>(num_commands);
+    pose.set__x(a * sin(2 * pi * t));
+    pose.set__y(b * sin(4 * pi * t));
+
+    pose.set__yaw(atan2(b * 4 * pi * cos(4 * pi * t), a * 2 * pi * cos(2 * pi * t)));
     robot_pose_msgs_.push_back(pose);
   }
 

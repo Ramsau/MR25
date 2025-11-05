@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-model schematypens="http://www.w3.org/2001/XMLSchema"?>
+
+<launch>
+  <!-- Launch arguments -->
+  <arg name="use_sim_time" default="true" />
+
+  <!-- Kinematic Node -->
+  <include file="$(find-pkg-share tug_mr2)/launch/kinematic_launch.xml"/>
+  <!-- Stage Node -->
+  <include file="$(find-pkg-share tug_stage_ros2)/launch/kinematic_launch.xml"/>
+</launch>
