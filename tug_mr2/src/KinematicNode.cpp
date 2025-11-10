@@ -58,18 +58,18 @@ void KinematicNode::movementCallback(const Movement::ConstSharedPtr& msg)
 
   robot_pose_msgs_.clear();
 
-  // TODO: Compute the robot's position and heading
+  // Compute the robot's position and heading
   //       Push the calculated values to the robot_pose_msgs_ vector
 
-  float a = 5;
-  float b = 4;
-  float path_time = 30.0;
-  float command_freq = 20.0;
+  double a = 5;
+  double b = 4;
+  double path_time = 30.0;
+  double command_freq = 20.0;
   int num_commands = path_time * command_freq;
-  float pi = 3.14159265358979323846;
+  double pi = 3.14159265358979323846;
   for (int i = 0; i < num_commands; i++) {
     auto pose = RobotPose();
-    float t = static_cast<float>(i) / static_cast<float>(num_commands);
+    double t = static_cast<double>(i) / static_cast<double>(num_commands);
     pose.set__x(a * sin(2 * pi * t));
     pose.set__y(b * sin(4 * pi * t));
 
@@ -81,6 +81,31 @@ void KinematicNode::movementCallback(const Movement::ConstSharedPtr& msg)
 
   // TODO: Compute the robot's linear and angular velocities
   //       Push the calculated values to the cmd_vel_msgs_ vector
+
+  for (int i = 0; i < num_commands; i++) {
+    double t = static_cast<double>(i) / static_cast<double>(num_commands);
+
+    auto vel = Twist();
+    double vx = a * 2 * pi * cos(2 * pi * t);
+    double vy = b * 4 * pi * cos(4 * pi * t);
+    double speed = hypot(vx, vy);
+    geometry_msgs::msg::Vector3 linear;
+    linear.set__x(speed);
+    linear.set__y(0.0);
+    linear.set__z(0.0);
+    vel.set__linear(linear);
+
+    double vx_vy = vy / vx;
+    double ax = -4 * pi * pi * a * sin(2 * pi * t);
+    double ay = -16 * pi * pi * b * sin(4 * pi * t);
+    double yaw_rate = (vx * ay - vy * ax) / (vx * vx + vy * vy);
+    geometry_msgs::msg::Vector3 angular;
+    angular.set__x(0.0);
+    angular.set__y(0.0);
+    angular.set__z(yaw_rate);
+    vel.set__angular(angular);
+    cmd_vel_msgs_.push_back(vel);
+  }
 
   bicycle_msgs_.clear();
 
