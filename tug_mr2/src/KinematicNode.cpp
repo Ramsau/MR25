@@ -67,6 +67,7 @@ void KinematicNode::movementCallback(const Movement::ConstSharedPtr& msg)
   double command_freq = 20.0;
   int num_commands = path_time * command_freq;
   double pi = 3.14159265358979323846;
+
   for (int i = 0; i < num_commands; i++) {
     auto pose = RobotPose();
     double t = static_cast<double>(i) / static_cast<double>(num_commands);
@@ -88,17 +89,26 @@ void KinematicNode::movementCallback(const Movement::ConstSharedPtr& msg)
     auto vel = Twist();
     double vx = a * 2 * pi * cos(2 * pi * t);
     double vy = b * 4 * pi * cos(4 * pi * t);
-    double speed = hypot(vx, vy);
+    double speed = hypot(vx, vy) / path_time;
     geometry_msgs::msg::Vector3 linear;
     linear.set__x(speed);
     linear.set__y(0.0);
     linear.set__z(0.0);
     vel.set__linear(linear);
 
-    double vx_vy = vy / vx;
     double ax = -4 * pi * pi * a * sin(2 * pi * t);
     double ay = -16 * pi * pi * b * sin(4 * pi * t);
-    double yaw_rate = (vx * ay - vy * ax) / (vx * vx + vy * vy);
+    
+    double k = (vx * ay - ax * vy) / sqrt(pow(pow(vx, 2) + pow(vy, 2), 3));
+    double w = (vx * ay - ax * vy) / (pow(vx, 2) + pow(vy,2));
+
+    double r = 1 / k;
+    //both yaw_rates should be the same
+    double yaw_rate = w/path_time;
+    yaw_rate = speed / r;
+    if (i % 10 == 0)
+      RCLCPP_WARN_STREAM(get_logger(), "curveture: " << k << " w: " << w << " r: " << r << " yaw: " << yaw_rate);
+
     geometry_msgs::msg::Vector3 angular;
     angular.set__x(0.0);
     angular.set__y(0.0);
