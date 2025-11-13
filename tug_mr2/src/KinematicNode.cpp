@@ -122,6 +122,31 @@ void KinematicNode::movementCallback(const Movement::ConstSharedPtr& msg)
   // TODO: Compute the robot's translational velocity and steering angle
   //       Push the calculated values to the bicycle_msgs_ vector
 
+  double L = 0.8;
+
+  for (int i = 0; i < num_commands; i++) {
+    double t = static_cast<double>(i) / static_cast<double>(num_commands);
+
+    auto bike_command = Bicycle();
+    double vx = a * 2 * pi * cos(2 * pi * t);
+    double vy = b * 4 * pi * cos(4 * pi * t);
+    double speed = hypot(vx, vy) / path_time;
+    bike_command.set__velocity(speed);
+
+    double ax = -4 * pi * pi * a * sin(2 * pi * t);
+    double ay = -16 * pi * pi * b * sin(4 * pi * t);
+    
+    double k = (vx * ay - ax * vy) / sqrt(pow(pow(vx, 2) + pow(vy, 2), 3));
+    double r = 1 / k;
+    double steering_angle = atan(L/r);
+
+    if (i % 10 == 0)
+      RCLCPP_WARN_STREAM(get_logger(), "curveture: " << k << " r: " << r << " angle: " << steering_angle);
+
+    bike_command.set__steering_angle(steering_angle);
+    bicycle_msgs_.push_back(bike_command);
+  }
+
   step_count_++;
 }
 
