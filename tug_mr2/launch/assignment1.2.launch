@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-model schematypens="http://www.w3.org/2001/XMLSchema"?>
+
+<launch>
+  <!-- Launch arguments -->
+  <arg name="use_sim_time" default="true" />
+  <arg name="rviz" default="true" description="Start RViz"/>
+
+  <!-- Stage Node -->
+  <include file="$(find-pkg-share tug_stage_ros2)/launch/transform_launch.xml">
+    <arg name="rviz" value="$(var rviz)"/>
+  </include>
+
+  <!-- Transform Node -->
+  <include file="$(find-pkg-share tug_mr2)/launch/transform_launch.xml"/>
+
+  <!-- Keyboard Teleop Node -->
+<!--    Doesn't work from a launch file-->
+<!--   <node pkg="teleop_twist_keyboard" exec="teleop_twist_keyboard" name="teleop_twist_keyboard"> -->
+<!--     <remap from="/cmd_vel" to="/tug_stage_ros2/robot_0/cmd_vel"/> -->
+<!--   </node> -->
+
+</launch>
