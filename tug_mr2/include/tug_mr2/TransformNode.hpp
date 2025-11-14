@@ -6,6 +6,7 @@
 #include "nav_msgs/msg/odometry.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "sensor_msgs/msg/point_cloud.hpp"
+#include <eigen3/Eigen/Core>
 
 namespace tug_mr2
 {
@@ -27,6 +28,8 @@ class TransformNode : public rclcpp::Node
     // Subscriber
     rclcpp::Subscription<LaserScan>::SharedPtr laser_sub_;
     rclcpp::Subscription<Odometry>::SharedPtr odom_sub_;
+
+    Eigen::Matrix4Xd footprint_odom_transform_ = Eigen::Matrix4Xd::Identity(4, 4) ;
 
   // Methods -------------------------------------------------------------------
   public:

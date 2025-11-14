@@ -37,7 +37,7 @@ void TransformNode::laserCallback(const LaserScan::ConstSharedPtr& msg)
 {
   PointCloud pc;
   pc.header.stamp = get_clock()->now();
-  pc.header.frame_id = "robot_0/mounting_plate";
+  pc.header.frame_id = "odom";
 
   // TODO: Add your manual transformation calculation here
   //       You can add variables to the class if neded
@@ -75,6 +75,18 @@ void TransformNode::laserCallback(const LaserScan::ConstSharedPtr& msg)
       };
       pt = Translate_laser_mounting_plate * Phi_laser_mounting_plate * Theta_laser_mounting_plate * pt;
 
+      // mounting plate -> base footprint
+      Eigen::MatrixX4d Translate_mounting_plate_base_footprint{
+        {1, 0, 0, 0},
+        {0, 1, 0, 0},
+        {0, 0, 1, 0.1},
+        {0, 0, 0, 1},
+      };
+      pt = Translate_mounting_plate_base_footprint * pt;
+
+      // base footprint -> odom
+      pt = footprint_odom_transform_ * pt;
+
       geometry_msgs::msg::Point32 point;
       point.x = static_cast<float>(pt[0]);
       point.y = static_cast<float>(pt[1]);
@@ -93,6 +105,33 @@ void TransformNode::odomCallback(const Odometry::ConstSharedPtr& msg)
 {
   // TODO: Add your manual transformation calculation here
   //       You can add variables to the class if neded
+  Eigen::MatrixX4d translate_odom_base{
+    {1, 0, 0, msg->pose.pose.position.x},
+    {0, 1, 0, msg->pose.pose.position.y},
+    {0, 0, 1, msg->pose.pose.position.z},
+    {0, 0, 0, 1}
+  };
+
+  // use quaternion rotation
+  double x = msg->pose.pose.orientation.x;
+  double y = msg->pose.pose.orientation.y;
+  double z = msg->pose.pose.orientation.z;
+  double w = msg->pose.pose.orientation.w;
+
+  // normalize
+  double mag = sqrt(x * x + y * y + z * z + w * w);
+  x /= mag;
+  y /= mag;
+  z /= mag;
+  w /= mag;
+
+  // create homogeneous rotation matrix
+  Eigen::MatrixX4d rotate_odom_base {
+    {1 - 2 * y * y - 2 * z * z, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0},
+    {2 * x * y + 2 * w * z, 1 - 2 * x * x - 2 * z * z, 2 * y * z - 2 * w * x, 0},
+    {2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, 1 - 2 * x * x - 2 * y * y, 0},
+    {0, 0, 0, 1}
+  };
 }
 
 } /* namespace tug_mr2 */
