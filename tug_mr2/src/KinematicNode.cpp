@@ -68,13 +68,15 @@ void KinematicNode::movementCallback(const Movement::ConstSharedPtr& msg)
   int num_commands = path_time * command_freq;
   double pi = 3.14159265358979323846;
 
+  double Omega = 2 * pi / path_time;
+
   for (int i = 0; i < num_commands; i++) {
     auto pose = RobotPose();
-    double t = static_cast<double>(i) / static_cast<double>(num_commands);
-    pose.set__x(a * sin(2 * pi * t));
-    pose.set__y(b * sin(4 * pi * t));
+    double t = static_cast<double>(i) / command_freq;
+    pose.set__x(a * sin(Omega * t));
+    pose.set__y(b * sin(2 * Omega * t));
 
-    pose.set__yaw(atan2(b * 4 * pi * cos(4 * pi * t), a * 2 * pi * cos(2 * pi * t)));
+    pose.set__yaw(atan2(b * 2 * Omega * cos(2 * Omega * t), a * Omega * cos(Omega * t)));
     robot_pose_msgs_.push_back(pose);
   }
 
@@ -84,27 +86,27 @@ void KinematicNode::movementCallback(const Movement::ConstSharedPtr& msg)
   //       Push the calculated values to the cmd_vel_msgs_ vector
 
   for (int i = 0; i < num_commands; i++) {
-    double t = static_cast<double>(i) / static_cast<double>(num_commands);
+    double t = static_cast<double>(i) / command_freq;
 
     auto vel = Twist();
-    double vx = a * 2 * pi * cos(2 * pi * t);
-    double vy = b * 4 * pi * cos(4 * pi * t);
-    double speed = hypot(vx, vy) / path_time;
+    double vx = a * Omega * cos(Omega * t);
+    double vy = b * 2 * Omega * cos(2 * Omega * t);
+    double speed = hypot(vx, vy);
     geometry_msgs::msg::Vector3 linear;
     linear.set__x(speed);
     linear.set__y(0.0);
     linear.set__z(0.0);
     vel.set__linear(linear);
 
-    double ax = -4 * pi * pi * a * sin(2 * pi * t);
-    double ay = -16 * pi * pi * b * sin(4 * pi * t);
+    double ax = -1 * pow(Omega, 2) * a * sin(Omega * t);
+    double ay = -4 * pow(Omega, 2) * b * sin(2 * Omega * t);
     
     double k = (vx * ay - ax * vy) / sqrt(pow(pow(vx, 2) + pow(vy, 2), 3));
     double w = (vx * ay - ax * vy) / (pow(vx, 2) + pow(vy,2));
 
     double r = 1 / k;
     //both yaw_rates should be the same
-    double yaw_rate = w/path_time;
+    double yaw_rate = w;
     yaw_rate = speed / r;
     if (i % 10 == 0)
       RCLCPP_WARN_STREAM(get_logger(), "curveture: " << k << " w: " << w << " r: " << r << " yaw: " << yaw_rate);
@@ -125,25 +127,25 @@ void KinematicNode::movementCallback(const Movement::ConstSharedPtr& msg)
   double L = 0.8;
 
   for (int i = 0; i < num_commands; i++) {
-    double t = static_cast<double>(i) / static_cast<double>(num_commands);
+    double t = static_cast<double>(i) / command_freq;
 
     auto bike_command = Bicycle();
-    double vx = a * 2 * pi * cos(2 * pi * t);
-    double vy = b * 4 * pi * cos(4 * pi * t);
-    double speed = hypot(vx, vy) / path_time;
+    double vx = a * Omega * cos(Omega * t);
+    double vy = b * 2 * Omega * cos(2 * Omega * t);
+    double speed = hypot(vx, vy);
     bike_command.set__velocity(speed);
 
-    double ax = -4 * pi * pi * a * sin(2 * pi * t);
-    double ay = -16 * pi * pi * b * sin(4 * pi * t);
+    double ax = -1 * pow(Omega, 2) * a * sin(Omega * t);
+    double ay = -4 * pow(Omega, 2) * b * sin(2 * Omega * t);
     
     double k = (vx * ay - ax * vy) / sqrt(pow(pow(vx, 2) + pow(vy, 2), 3));
     double r = 1 / k;
-    double steering_angle = atan(L/r);
+    double gamma = atan(L/r);
 
     if (i % 10 == 0)
-      RCLCPP_WARN_STREAM(get_logger(), "curveture: " << k << " r: " << r << " angle: " << steering_angle);
+      RCLCPP_WARN_STREAM(get_logger(), "curveture: " << k << " r: " << r << " angle: " << gamma);
 
-    bike_command.set__steering_angle(steering_angle);
+    bike_command.set__steering_angle(gamma);
     bicycle_msgs_.push_back(bike_command);
   }
 
