@@ -113,25 +113,28 @@ void TransformNode::odomCallback(const Odometry::ConstSharedPtr& msg)
   };
 
   // use quaternion rotation
-  double x = msg->pose.pose.orientation.x;
-  double y = msg->pose.pose.orientation.y;
-  double z = msg->pose.pose.orientation.z;
-  double w = msg->pose.pose.orientation.w;
+  double q0 = msg->pose.pose.orientation.w;
+  double q1 = msg->pose.pose.orientation.x;
+  double q2 = msg->pose.pose.orientation.y;
+  double q3 = msg->pose.pose.orientation.z;
 
   // normalize
-  double mag = sqrt(x * x + y * y + z * z + w * w);
-  x /= mag;
-  y /= mag;
-  z /= mag;
-  w /= mag;
+  double mag = sqrt(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
+  q0 /= mag;
+  q1 /= mag;
+  q2 /= mag;
+  q3 /= mag;
 
   // create homogeneous rotation matrix
+  // see script
   Eigen::MatrixX4d rotate_odom_base {
-    {1 - 2 * y * y - 2 * z * z, 2 * x * y - 2 * w * z, 2 * x * z + 2 * w * y, 0},
-    {2 * x * y + 2 * w * z, 1 - 2 * x * x - 2 * z * z, 2 * y * z - 2 * w * x, 0},
-    {2 * x * z - 2 * w * y, 2 * y * z + 2 * w * x, 1 - 2 * x * x - 2 * y * y, 0},
+    {q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3, 2 * (q1 * q2 - q0 * q3), 2 * (q1 * q3 + q0 * q2), 0},
+    {2 * (q1 * q2 + q0 * q3), q0 * q0 - q1 * q1 + q2 * q2 - q3 * q3, 2 * (q2 * q3 - q0 * q1), 0},
+    {2 * (q1 * q3 - q0 * q2), 2 * (q2 * q3 + q0 * q1), q0 * q0 - q1 * q1 - q2 * q2 + q3 * q3, 0},
     {0, 0, 0, 1}
   };
+
+  footprint_odom_transform_ = translate_odom_base * rotate_odom_base;
 }
 
 } /* namespace tug_mr2 */
