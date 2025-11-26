@@ -63,7 +63,11 @@ void SimpleTurtleNode::wheelEncoderCallback(
   const WheelEncoder::ConstSharedPtr& msg
 )
 {
-  // TODO: Add your odometry estimation here
+  static size_t call_num = 0;
+  // Add your odometry estimation here
+  auto rotation = tf2::Quaternion(0.0, 0.0, 0.0, 1.0);
+  auto translation = tf2::Vector3(0.001 * call_num++, 0.0, 0.0);
+  publishTransform(rotation, translation);
 }
 
 // -----------------------------------------------------------------------------
