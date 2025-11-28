@@ -63,11 +63,49 @@ void SimpleTurtleNode::wheelEncoderCallback(
   const WheelEncoder::ConstSharedPtr& msg
 )
 {
-  static size_t call_num = 0;
   // Add your odometry estimation here
-  auto rotation = tf2::Quaternion(0.0, 0.0, 0.0, 1.0);
-  auto translation = tf2::Vector3(0.001 * call_num++, 0.0, 0.0);
-  publishTransform(rotation, translation);
+  static size_t call_num = 0;
+  static int last_left_val = msg->left_counter;
+  static int last_right_val = msg->right_counter;
+  static tf2::Vector3 translation{0, 0, 0};
+  static double theta = 0;
+
+  const double ticks_per_rev = 2573;
+  const double wheel_diam = 0.0715;
+  const double wheel_circum = wheel_diam * M_PI;
+  const double wheel_base = 0.233;
+
+  int moved_ticks_left = msg->left_counter - last_left_val;
+  int moved_ticks_right = msg->right_counter - last_right_val;
+  if (moved_ticks_left > 1 << 15) {
+    moved_ticks_left -= 1 << 16;
+  } else if (moved_ticks_left < -(1 << 15)) {
+    moved_ticks_left += 1 << 16;
+  }
+  if (moved_ticks_right > 1 << 15) {
+    moved_ticks_right -= 1 << 16;
+  } else if (moved_ticks_right < -(1 << 15)) {
+    moved_ticks_right += 1 << 16;
+  }
+  last_left_val = msg->left_counter;
+  last_right_val = msg->right_counter;
+
+  double dist_left = moved_ticks_left * wheel_circum / ticks_per_rev;
+  double dist_right = moved_ticks_right * wheel_circum / ticks_per_rev;
+
+  double delta_s = (dist_left + dist_right) / 2.0;
+  double delta_theta = (dist_right - dist_left) / wheel_base;
+
+  translation += tf2::Vector3(
+    delta_s * cos(theta + delta_theta / 2.0),
+    delta_s * sin(theta + delta_theta / 2.0),
+    0
+  );
+  theta += delta_theta;
+
+  tf2::Quaternion quat{0, 0, 0, 1};
+  quat.setRPY(0, 0, theta);
+  publishTransform(quat, translation);
 }
 
 // -----------------------------------------------------------------------------
