@@ -7,6 +7,8 @@
 #include "geometry_msgs/msg/transform_stamped.hpp"
 
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "tf2/utils.h"
+#include "rclcpp/time.hpp"
 
 namespace tug_turtlebot4
 {
@@ -106,12 +108,37 @@ void SimpleTurtleNode::wheelEncoderCallback(
   tf2::Quaternion quat{0, 0, 0, 1};
   quat.setRPY(0, 0, theta);
   publishTransform(quat, translation);
+
+  // do odom logging
+  static rclcpp::Time last_log = get_clock()->now();
+  static int logged_ticks_left = 0;
+  static int logged_ticks_right = 0;
+
+  logged_ticks_left += moved_ticks_left;
+  logged_ticks_right += moved_ticks_right;
+
+  if (get_clock()->now() - last_log > rclcpp::Duration::from_seconds(0.2)) {
+    last_log = get_clock()->now();
+    odom_file_ << last_log.nanoseconds() << " " << logged_ticks_left << " " << logged_ticks_right << std::endl;
+    logged_ticks_left = logged_ticks_right = 0;
+  }
 }
 
 // -----------------------------------------------------------------------------
 void SimpleTurtleNode::poseCallback(const Pose& msg)
 {
-  // TODO: Use pose callback for calibration
+  static rclcpp::Time last_log = get_clock()->now();
+  static const int buf_len = 10;
+  static Pose buf[buf_len];
+  static int buf_idx = 0;
+
+  buf[buf_idx] = msg;
+  buf_idx = (buf_idx + 1) % buf_len;
+
+  if (get_clock()->now() - last_log > rclcpp::Duration::from_seconds(0.2)) {
+    last_log = get_clock()->now();
+    pose_file_ << last_log.nanoseconds() << " " << msg.position.x << " " << msg.position.y << " " << tf2::getYaw(msg.orientation) << std::endl;
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -147,7 +174,63 @@ void SimpleTurtleNode::step()
 // -----------------------------------------------------------------------------
 void SimpleTurtleNode::initMotionPattern()
 {
-  //TODO: Add motion pattern
+  cmd_vel_msgs_.push_back(Twist());
+
+  // straight forward for a second
+  for (int i = 0; i < 50; i++) {
+    Twist twist = Twist();
+    twist.linear.x = 0.2;
+    cmd_vel_msgs_.push_back(twist);
+  }
+
+  // turn left for a second
+  for (int i = 0; i < 50; i++) {
+    Twist twist = Twist();
+    twist.angular.z = 0.5;
+    cmd_vel_msgs_.push_back(twist);
+  }
+
+  // straight forward for a second
+  for (int i = 0; i < 50; i++) {
+    Twist twist = Twist();
+    twist.linear.x = 0.2;
+    cmd_vel_msgs_.push_back(twist);
+  }
+
+  // turn right for a second
+  for (int i = 0; i < 50; i++) {
+    Twist twist = Twist();
+    twist.angular.z = -0.5;
+    cmd_vel_msgs_.push_back(twist);
+  }
+
+  // straight backward for a second
+  for (int i = 0; i < 50; i++) {
+    Twist twist = Twist();
+    twist.linear.x = -0.2;
+    cmd_vel_msgs_.push_back(twist);
+  }
+
+  // turn left for a second
+  for (int i = 0; i < 50; i++) {
+    Twist twist = Twist();
+    twist.angular.z = 0.5;
+    cmd_vel_msgs_.push_back(twist);
+  }
+
+  // straight backward for a second
+  for (int i = 0; i < 50; i++) {
+    Twist twist = Twist();
+    twist.linear.x = -0.2;
+    cmd_vel_msgs_.push_back(twist);
+  }
+
+  // turn right for a second
+  for (int i = 0; i < 50; i++) {
+    Twist twist = Twist();
+    twist.angular.z = -0.5;
+    cmd_vel_msgs_.push_back(twist);
+  }
   cmd_vel_msgs_.push_back(Twist());
 }
 
