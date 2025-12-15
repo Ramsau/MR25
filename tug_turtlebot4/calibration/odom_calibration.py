@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib
 from matplotlib.axes import Axes
+from scipy.optimize import least_squares
 
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
@@ -65,18 +66,53 @@ def encoders_to_poses(encoder_data, init_x=0.0, init_y=0.0, init_yaw=0.0, wheel_
         data['y'].append(data['y'][i] + delta_s[i] * np.sin(data['theta'][i] + delta_theta[i]))
         data['theta'].append(data['theta'][i] + delta_theta[i])
 
+    data['stamp'] = np.array(data['stamp'])
+    data['x'] = np.array(data['x'])
+    data['y'] = np.array(data['y'])
+    data['theta'] = np.array(data['theta'])
+
     return data
 
 def optimise_odometry(encoder_data, pose_data):
-    wheel_speeds_left = encoder_data['encoder_right'] / TICKS_PER_REV * 2 * np.pi
-    wheel_speeds_right = encoder_data['encoder_left'] / TICKS_PER_REV * 2 * np.pi
-    print("TODO: Implement odometry optimisation.")
+    time_diffs = np.diff(pose_data['stamp'], prepend=pose_data['stamp'][1] - 2 * pose_data['stamp'][0]) * 1e-9
+
+    # TODO cont here
+    wheel_speeds_left = encoder_data['encoder_left'] / TICKS_PER_REV * 2 * np.pi * time_diffs
+    wheel_speeds_right = encoder_data['encoder_right'] / TICKS_PER_REV * 2 * np.pi * time_diffs
+
+    rotational_speeds = np.diff(pose_data['theta'], prepend=pose_data['theta'][0])
+
+    L = np.vstack([wheel_speeds_left, wheel_speeds_right])
+
+
+    J2 = np.sum(L * rotational_speeds, axis=-1) / np.sum(L * L)
+
+    r_theta = lambda b: J2[0] * wheel_speeds_left + J2[1] * wheel_speeds_right
+    # c_x = lambda b : 0.5 *
+    #
+    # r_x = lambda b: c_x(b) * b
+    # r_y = lambda b: c_y(b) * b
+    #
+    # s_k = np.vstack([pose_data['x'], pose_data['y'], pose_data['theta']]).T
+    # r_k = lambda b: np.vstack([r_x(b), r_y(b), r_theta(b)])
+    #
+    # e_k = lambda b: s_k - r_k(b)
+    #
+    # b = least_squares(e_k, 0.233)
+
     return
+
+def linear_interp(data_timeref, data_value):
+    data_out = {'stamp': []}
+    for key in data_value.keys():
+        data_out[key] = np.interp(data_timeref['stamp'], data_value['stamp'], data_value[key])
+
+    return data_out
 
 def main():
     # Read data files
     pose_data = read_pose_data('../../../../pose.dat')
-    odom_data = read_odom_data('../../../../odom.dat')
+    odom_data = linear_interp(pose_data, read_odom_data('../../../../odom.dat'))
 
     # Convert encoder data to pose data
     odom_pose_data_naive = encoders_to_poses(odom_data)
@@ -99,8 +135,8 @@ def main():
     ax2.set_ylabel('Yaw Angle')
     ax2.set_xlabel('Time (s)')
     ax2.grid(True)
-    ax2.plot(pose_data['stamp'], pose_data['theta'], color='blue')
-    ax2.plot(odom_pose_data_naive['stamp'], odom_pose_data_naive['theta'], color='red')
+    ax2.plot(pose_data['stamp'] * 1e-9, pose_data['theta'], color='blue')
+    ax2.plot(odom_pose_data_naive['stamp'] * 1e-9, odom_pose_data_naive['theta'], color='red')
     ax2.legend(['Ground Truth', 'Odometry (naive)'])
 
     plt.tight_layout()
