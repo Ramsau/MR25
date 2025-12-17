@@ -16,6 +16,8 @@ def read_pose_data(filename):
         'y': data[:, 2],
         'theta': data[:, 3]
     }
+    # remap theta so it fits nicely to rest of data
+    data['theta'][data['theta'] < -0.1] += 2 * np.pi
     return data
 
 
@@ -45,11 +47,12 @@ def visualize_poses(ax, pose_data, color='1'):
     for i in range(0, len(pose_data['x'])):
         draw_arrow(ax, pose_data['x'][i], pose_data['y'][i], pose_data['theta'][i], color=color)
 
-def encoders_to_poses(encoder_data, init_x=0.0, init_y=0.0, init_yaw=0.0, wheel_diam=0.0715, wheel_base=0.233):
+def encoders_to_poses(encoder_data, init_x=0.0, init_y=0.0, init_yaw=0.0, wheel_diam_left=0.0715, wheel_diam_right=0.0715, wheel_base=0.233):
     global TICKS_PER_REV
-    wheel_circumference = wheel_diam * np.pi
-    dist_left = encoder_data['encoder_left'] * wheel_circumference / TICKS_PER_REV
-    dist_right = encoder_data['encoder_right'] * wheel_circumference / TICKS_PER_REV
+    wheel_circumference_left = wheel_diam_left * np.pi
+    wheel_circumference_right = wheel_diam_right * np.pi
+    dist_left = encoder_data['encoder_left'] * wheel_circumference_left / TICKS_PER_REV
+    dist_right = encoder_data['encoder_right'] * wheel_circumference_right / TICKS_PER_REV
     delta_s = (dist_left + dist_right) / 2
     delta_theta = (dist_right - dist_left) / wheel_base
 
@@ -74,33 +77,41 @@ def encoders_to_poses(encoder_data, init_x=0.0, init_y=0.0, init_yaw=0.0, wheel_
     return data
 
 def optimise_odometry(encoder_data, pose_data):
-    time_diffs = np.diff(pose_data['stamp'], prepend=pose_data['stamp'][1] - 2 * pose_data['stamp'][0]) * 1e-9
+    time_diffs = np.diff(pose_data['stamp'], prepend=pose_data['stamp'][0]) * 1e-9
 
-    # TODO cont here
-    wheel_speeds_left = encoder_data['encoder_left'] / TICKS_PER_REV * 2 * np.pi * time_diffs
-    wheel_speeds_right = encoder_data['encoder_right'] / TICKS_PER_REV * 2 * np.pi * time_diffs
+    wheel_speeds_left = encoder_data['encoder_left'] / TICKS_PER_REV * 2 * np.pi
+    wheel_speeds_right = encoder_data['encoder_right'] / TICKS_PER_REV * 2 * np.pi
 
     rotational_speeds = np.diff(pose_data['theta'], prepend=pose_data['theta'][0])
 
-    L = np.vstack([wheel_speeds_left, wheel_speeds_right])
+    L = np.column_stack((wheel_speeds_left, wheel_speeds_right))
 
+    # Least squares estimate of [J21, J22]
+    J2, *_ = np.linalg.lstsq(L, rotational_speeds, rcond=None)
 
-    J2 = np.sum(L * rotational_speeds, axis=-1) / np.sum(L * L)
+    v_l_est = lambda s: wheel_speeds_left * s[0]
+    v_r_est = lambda s: wheel_speeds_right * s[1]
+    v_est = lambda s: (v_l_est(s) + v_r_est(s)) / 2
+    omega_est = lambda s: (v_r_est(s) - v_l_est(s)) / s[2]
+    theta_est = lambda s: np.cumsum(omega_est(s))
+    r_x = lambda s: v_est(s) * np.cos(theta_est(s))
+    r_y = lambda s: v_est(s) * np.sin(theta_est(s))
+    state_est = lambda s: np.column_stack((r_x(s), r_y(s), omega_est(s)))
+    state_obs = np.column_stack((
+        np.diff(pose_data['x'], prepend=pose_data['x'][0]),
+        np.diff(pose_data['y'], prepend=pose_data['y'][0]),
+        np.diff(pose_data['theta'], prepend=pose_data['theta'][0])
+    ))
+    e = lambda s: state_obs - state_est(s)
 
-    r_theta = lambda b: J2[0] * wheel_speeds_left + J2[1] * wheel_speeds_right
-    # c_x = lambda b : 0.5 *
-    #
-    # r_x = lambda b: c_x(b) * b
-    # r_y = lambda b: c_y(b) * b
-    #
-    # s_k = np.vstack([pose_data['x'], pose_data['y'], pose_data['theta']]).T
-    # r_k = lambda b: np.vstack([r_x(b), r_y(b), r_theta(b)])
-    #
-    # e_k = lambda b: s_k - r_k(b)
-    #
-    # b = least_squares(e_k, 0.233)
+    # Perform least squares optimization
+    result = least_squares(lambda s: e(s).ravel(), x0=np.array([0.0715/2, 0.0715/2, 0.233]))
+    optimized_rl = result.x[0]
+    optimized_rr = result.x[1]
+    optimized_b = result.x[2]
 
-    return
+    return optimized_rl, optimized_rr, optimized_b
+
 
 def linear_interp(data_timeref, data_value):
     data_out = {'stamp': []}
@@ -118,7 +129,12 @@ def main():
     odom_pose_data_naive = encoders_to_poses(odom_data)
 
     # Optimise odometry
-    odom_pose_data_optimised = optimise_odometry(odom_data, pose_data)
+    rl, rr, b = optimise_odometry(odom_data, pose_data)
+    odom_pose_data_optimized = encoders_to_poses(odom_data, wheel_base=b, wheel_diam_left=rl*2, wheel_diam_right=rr*2)
+
+    print(f"Optimized wheel base: {b}")
+    print(f"Optimized wheel diameter left: {rl*2}")
+    print(f"Optimized wheel diameter right: {rr*2}")
 
     # Visualize the data
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
@@ -130,6 +146,7 @@ def main():
     ax1.grid(True)
     visualize_poses(ax1, pose_data, 'blue')
     visualize_poses(ax1, odom_pose_data_naive, 'red')
+    visualize_poses(ax1, odom_pose_data_optimized, 'green')
 
     # Yaw angle plot
     ax2.set_ylabel('Yaw Angle')
@@ -137,7 +154,8 @@ def main():
     ax2.grid(True)
     ax2.plot(pose_data['stamp'] * 1e-9, pose_data['theta'], color='blue')
     ax2.plot(odom_pose_data_naive['stamp'] * 1e-9, odom_pose_data_naive['theta'], color='red')
-    ax2.legend(['Ground Truth', 'Odometry (naive)'])
+    ax2.plot(odom_pose_data_optimized['stamp'] * 1e-9, odom_pose_data_optimized['theta'], color='green')
+    ax2.legend(['Ground Truth', 'Odometry (naive)', 'Odometry (optimized)'])
 
     plt.tight_layout()
 

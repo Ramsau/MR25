@@ -176,8 +176,8 @@ void SimpleTurtleNode::initMotionPattern()
 {
   cmd_vel_msgs_.push_back(Twist());
 
-  // straight forward for three seconds
-  for (int i = 0; i < 60; i++) {
+  // straight forward for five seconds
+  for (int i = 0; i < 100; i++) {
     Twist twist = Twist();
     twist.linear.x = 0.4;
     cmd_vel_msgs_.push_back(twist);
@@ -194,28 +194,10 @@ void SimpleTurtleNode::initMotionPattern()
 
   cmd_vel_msgs_.push_back(Twist());
 
-  // straight forward for three seconds
-  for (int i = 0; i < 60; i++) {
+  // straight forward for five seconds
+  for (int i = 0; i < 100; i++) {
     Twist twist = Twist();
     twist.linear.x = 0.4;
-    cmd_vel_msgs_.push_back(twist);
-  }
-
-  cmd_vel_msgs_.push_back(Twist());
-
-  // turn right 90 degrees in one second
-  for (int i = 0; i < 20; i++) {
-    Twist twist = Twist();
-    twist.angular.z = -M_PI / 2;
-    cmd_vel_msgs_.push_back(twist);
-  }
-
-  cmd_vel_msgs_.push_back(Twist());
-
-  // straight backward for three seconds
-  for (int i = 0; i < 60; i++) {
-    Twist twist = Twist();
-    twist.linear.x = -0.4;
     cmd_vel_msgs_.push_back(twist);
   }
 
@@ -230,19 +212,39 @@ void SimpleTurtleNode::initMotionPattern()
 
   cmd_vel_msgs_.push_back(Twist());
 
-  // straight backward for three seconds
-  for (int i = 0; i < 60; i++) {
+  // forward, slight curve left for five seconds
+  for (int i = 0; i < 100; i++) {
     Twist twist = Twist();
-    twist.linear.x = -0.4;
+    twist.linear.x = 0.4;
+    twist.angular.z = 0.1;
     cmd_vel_msgs_.push_back(twist);
   }
 
   cmd_vel_msgs_.push_back(Twist());
 
-  // turn right 90 degrees in one second
+  // turn left 90 degrees in one second
   for (int i = 0; i < 20; i++) {
     Twist twist = Twist();
-    twist.angular.z = -M_PI / 2;
+    twist.angular.z = M_PI / 2;
+    cmd_vel_msgs_.push_back(twist);
+  }
+
+  cmd_vel_msgs_.push_back(Twist());
+
+  // forward, slight curve right for five seconds
+  for (int i = 0; i < 100; i++) {
+    Twist twist = Twist();
+    twist.linear.x = 0.4;
+    twist.angular.z = -0.1;
+    cmd_vel_msgs_.push_back(twist);
+  }
+
+  cmd_vel_msgs_.push_back(Twist());
+
+  // turn left 90 degrees in one second
+  for (int i = 0; i < 20; i++) {
+    Twist twist = Twist();
+    twist.angular.z = M_PI / 2;
     cmd_vel_msgs_.push_back(twist);
   }
   cmd_vel_msgs_.push_back(Twist());
