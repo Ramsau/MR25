@@ -77,31 +77,31 @@ def encoders_to_poses(encoder_data, init_x=0.0, init_y=0.0, init_yaw=0.0, wheel_
     return data
 
 def optimise_odometry(encoder_data, pose_data):
-    time_diffs = np.diff(pose_data['stamp'], prepend=pose_data['stamp'][0]) * 1e-9
-
-    wheel_speeds_left = encoder_data['encoder_left'] / TICKS_PER_REV * 2 * np.pi
-    wheel_speeds_right = encoder_data['encoder_right'] / TICKS_PER_REV * 2 * np.pi
-
-    rotational_speeds = np.diff(pose_data['theta'], prepend=pose_data['theta'][0])
-
-    L = np.column_stack((wheel_speeds_left, wheel_speeds_right))
-
-    # Least squares estimate of [J21, J22]
-    J2, *_ = np.linalg.lstsq(L, rotational_speeds, rcond=None)
-
-    v_l_est = lambda s: wheel_speeds_left * s[0]
-    v_r_est = lambda s: wheel_speeds_right * s[1]
-    v_est = lambda s: (v_l_est(s) + v_r_est(s)) / 2
-    omega_est = lambda s: (v_r_est(s) - v_l_est(s)) / s[2]
-    theta_est = lambda s: np.cumsum(omega_est(s))
-    r_x = lambda s: v_est(s) * np.cos(theta_est(s))
-    r_y = lambda s: v_est(s) * np.sin(theta_est(s))
-    state_est = lambda s: np.column_stack((r_x(s), r_y(s), omega_est(s)))
+    d_phi_left = encoder_data['encoder_left'] / TICKS_PER_REV * 2 * np.pi
+    d_phi_right = encoder_data['encoder_right'] / TICKS_PER_REV * 2 * np.pi
+    d_x_obs = np.diff(pose_data['x'], prepend=pose_data['x'][0])
+    d_y_obs = np.diff(pose_data['y'], prepend=pose_data['y'][0])
+    d_s_obs = np.sqrt(d_x_obs**2 + d_y_obs**2)
+    d_theta_obs = np.diff(pose_data['theta'], prepend=pose_data['theta'][0])
     state_obs = np.column_stack((
-        np.diff(pose_data['x'], prepend=pose_data['x'][0]),
-        np.diff(pose_data['y'], prepend=pose_data['y'][0]),
-        np.diff(pose_data['theta'], prepend=pose_data['theta'][0])
+        d_x_obs,
+        d_y_obs,
+        d_theta_obs,
     ))
+
+    d_s_left_est = lambda s: d_phi_left * s[0]
+    d_s_right_est = lambda s: d_phi_right * s[1]
+    d_s_est = lambda s: (d_s_left_est(s) + d_s_right_est(s)) / 2
+    d_theta_est = lambda s: (d_s_right_est(s) - d_s_left_est(s)) / s[2]
+    theta_est = lambda s: np.cumsum(d_theta_est(s))
+    d_x_est = lambda s: d_s_est(s) * np.cos(theta_est(s))
+    d_y_est = lambda s: d_s_est(s) * np.sin(theta_est(s))
+    state_est = lambda s: np.column_stack((
+        d_x_est(s),
+        d_y_est(s),
+        d_theta_est(s)
+    ))
+
     e = lambda s: state_obs - state_est(s)
 
     # Perform least squares optimization
@@ -149,12 +149,12 @@ def main():
     visualize_poses(ax1, odom_pose_data_optimized, 'green')
 
     # Yaw angle plot
-    ax2.set_ylabel('Yaw Angle')
+    ax2.set_ylabel('Yaw rate')
     ax2.set_xlabel('Time (s)')
     ax2.grid(True)
-    ax2.plot(pose_data['stamp'] * 1e-9, pose_data['theta'], color='blue')
-    ax2.plot(odom_pose_data_naive['stamp'] * 1e-9, odom_pose_data_naive['theta'], color='red')
-    ax2.plot(odom_pose_data_optimized['stamp'] * 1e-9, odom_pose_data_optimized['theta'], color='green')
+    ax2.plot(pose_data['stamp'] * 1e-9, np.diff(pose_data['theta'], prepend=pose_data['theta'][0]), color='blue')
+    ax2.plot(odom_pose_data_naive['stamp'] * 1e-9, np.diff(odom_pose_data_naive['theta'], prepend=odom_pose_data_naive['theta'][0]), color='red')
+    ax2.plot(odom_pose_data_optimized['stamp'] * 1e-9, np.diff(odom_pose_data_optimized['theta'], prepend=odom_pose_data_optimized['theta'][0]), color='green')
     ax2.legend(['Ground Truth', 'Odometry (naive)', 'Odometry (optimized)'])
 
     plt.tight_layout()
