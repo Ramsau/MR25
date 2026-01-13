@@ -67,6 +67,11 @@ void SlamNode::laserScanCallback(const LaserScan::ConstSharedPtr& msg)
   // map estimation
   float angle = msg->angle_min;
   for (auto range: msg->ranges) {
+    if (std::isinf(range)) {
+      angle += msg->angle_increment;
+      continue;
+    }
+
     // get point in odom frame
     tf2::Vector3 point_robot(range * cos(angle), range * sin(angle), 0.0);
     tf2::Vector3 zero_robot(0.0, 0.0, 0.0);
@@ -108,6 +113,9 @@ void SlamNode::laserScanCallback(const LaserScan::ConstSharedPtr& msg)
     int dy = y_end - y_start;
     int x = x_start;
     int y = y_start;
+    if (x_end == 0) {
+      RCLCPP_WARN_STREAM(get_logger(),"x_end is 0");
+    }
     int incx = dx > 0 ? +1 : dx < 0 ? -1 : 0;
     int incy = dy > 0 ? +1 : dy < 0 ? -1 : 0;
 
@@ -136,13 +144,10 @@ void SlamNode::laserScanCallback(const LaserScan::ConstSharedPtr& msg)
     y = y_start;
     err = deltafastdirection / 2;
 
-    //RCLCPP_INFO_STREAM(get_logger(),"prob map: " << occupancy_grid_map_->getCell(x, y));
     og_prob = occValueToProb(occupancy_grid_map_->getCell(x, y));
     prob_l = probabilityToLogOdd(og_prob) + prob_free_l - prob_prior_l;
     prob = logOddToProbability(prob_l);
 
-    if( x == 148 && y == 139)
-      RCLCPP_INFO_STREAM(get_logger(),"Current pos Probability occupied: " << prob << " orioginal prob: " << og_prob << " x: " << x_end << " y: " << y_end);
 
     // occupancy_grid_map_->updateCell(x, y, logOddToProbability(prob_l));
     occupancy_grid_map_->updateCell(x, y, probToOccValue(prob));
@@ -172,31 +177,19 @@ void SlamNode::laserScanCallback(const LaserScan::ConstSharedPtr& msg)
       prob_l = probabilityToLogOdd(og_prob) + prob_free_l - prob_prior_l;
       prob = logOddToProbability(prob_l);
 
-      if( x == 148 && y == 139)
-        RCLCPP_INFO_STREAM(get_logger(),"Free Probability occupied: " << prob << " orioginal prob: " << og_prob << " x: " << x_end << " y: " << y_end);
 
       occupancy_grid_map_->updateCell(x, y, probToOccValue(prob));
-      // occupancy_grid_map_->updateCell(x, y, 100);
-
     }
 
-    // just for reference, ill paint the actual point in -100
     og_prob = occValueToProb(occupancy_grid_map_->getCell(x_end, y_end));
     prob_l = probabilityToLogOdd(og_prob) + prob_occupied_l - prob_prior_l;
     prob = logOddToProbability(prob_l);
 
-    if( x_end == 148 && y_end == 139)
-    {
-      RCLCPP_INFO_STREAM(get_logger(),"Probability occupied: " << prob << " orioginal prob: " << og_prob << " x: " << x_end << " y: " << y_end);
-    }
 
     occupancy_grid_map_->updateCell(x_end, y_end, probToOccValue(prob));
-    // occupancy_grid_map_->updateCell(x_end, y_end, -100);
 
 
     angle += msg->angle_increment;
-    //RCLCPP_INFO_STREAM(get_logger(),"Angle of Lidar ray: " << angle);
-    //RCLCPP_DEBUG(get_logger(), *get_clock(), 2000, "Could not transform point: %f", angle);
   }
 }
 
