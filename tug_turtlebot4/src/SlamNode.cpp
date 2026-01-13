@@ -28,6 +28,16 @@ SlamNode::SlamNode() :
     0.1F
   );
 
+  for (size_t row = 0; row < 3000; row++)
+  {
+    for (size_t col = 0; col < 3000; col++)
+    {
+      occupancy_grid_map_->updateCell(col, row, 50);
+    }
+    
+  }
+  
+
   // TF2
   tf_buffer_ = std::make_shared<tf2_ros::Buffer>(get_clock());
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(
@@ -65,6 +75,19 @@ void SlamNode::laserScanCallback(const LaserScan::ConstSharedPtr& msg)
       return;
     }
 
+    float prob_free = 0.9;
+    float prob_prior = 0.5;
+    float prob_occupied = 0.1;
+
+    float prob_free_l = probabilityToLogOdd(prob_free);
+    float prob_prior_l = probabilityToLogOdd(prob_prior);
+    float prob_occupied_l = probabilityToLogOdd(prob_occupied);
+
+    //RCLCPP_INFO_STREAM(get_logger(),"prob free log odd: " << prob_free_l);
+    //RCLCPP_INFO_STREAM(get_logger(),"prob free prob: " << logOddToProbability(prob_free_l));
+
+    float prob_l = prob_prior_l;
+
     // paint on occupancy grid map using bresenham
     // see https://de.wikipedia.org/wiki/Bresenham-Algorithmus
     uint32_t x_end, y_end, x_start, y_start;
@@ -74,8 +97,12 @@ void SlamNode::laserScanCallback(const LaserScan::ConstSharedPtr& msg)
     int dy = y_end - y_start;
     int x = x_start;
     int y = y_start;
-    int incx = abs(dx) > 0 ? 1 : 0;
-    int incy = abs(dy) > 0 ? 1 : 0;
+    int incx = dx > 0 ? +1 : dx < 0 ? -1 : 0;
+    int incy = dy > 0 ? +1 : dy < 0 ? -1 : 0;
+
+    if(dx < 0) dx = -dx;
+    if(dy < 0) dy = -dy;
+
     int t, pdx, pdy, ddx, ddy, deltaslowdirection, deltafastdirection, err;
 
     /* determine, which distance is greater */
@@ -97,7 +124,13 @@ void SlamNode::laserScanCallback(const LaserScan::ConstSharedPtr& msg)
     x = x_start;
     y = y_start;
     err = deltafastdirection / 2;
-    occupancy_grid_map_->updateCell(x, y, 100);
+
+    //RCLCPP_INFO_STREAM(get_logger(),"prob map: " << occupancy_grid_map_->getCell(x, y));
+
+    prob_l = probabilityToLogOdd(occupancy_grid_map_->getCell(x, y) / 100) + prob_free_l - prob_prior_l;
+    occupancy_grid_map_->updateCell(x, y, logOddToProbability(prob_l) * 100);
+    // occupancy_grid_map_->updateCell(x, y, 100);
+
 
     /* calculate pixels */
     for (t = 0; t < deltafastdirection; ++t)
@@ -118,14 +151,38 @@ void SlamNode::laserScanCallback(const LaserScan::ConstSharedPtr& msg)
         x += pdx;
         y += pdy;
       }
-      occupancy_grid_map_->updateCell(x, y, 100);
+
+      prob_l = probabilityToLogOdd(occupancy_grid_map_->getCell(x, y) / 100) + prob_free_l - prob_prior_l;
+      occupancy_grid_map_->updateCell(x, y, logOddToProbability(prob_l) * 100);
+      // occupancy_grid_map_->updateCell(x, y, 100);
+
     }
 
     // just for reference, ill paint the actual point in -100
-    occupancy_grid_map_->updateCell(x_end, y_end, -100);
+    prob_l = probabilityToLogOdd(occupancy_grid_map_->getCell(x, y) / 100) + prob_occupied_l - prob_prior_l;
+    occupancy_grid_map_->updateCell(x_end, y_end, logOddToProbability(prob_l) * 100);
+    //occupancy_grid_map_->updateCell(x_end, y_end, -100);
+
 
     angle += msg->angle_increment;
+    //RCLCPP_INFO_STREAM(get_logger(),"Angle of Lidar ray: " << angle);
+    //RCLCPP_DEBUG(get_logger(), *get_clock(), 2000, "Could not transform point: %f", angle);
   }
+}
+
+float SlamNode::probabilityToLogOdd(float probability)
+{
+  return std::log(probability / (1 - probability));
+}
+
+float SlamNode::logOddToProbability(float logOdd)
+{
+  return 1 - (1 / (1 + std::exp(logOdd)));
+}
+
+float SlamNode::probToOccValue(float prob)
+{
+  return -100 + 200 *prob;
 }
 
 } /* namespace tug_turtlebot */

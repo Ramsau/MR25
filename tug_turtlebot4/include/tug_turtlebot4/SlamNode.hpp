@@ -48,6 +48,11 @@ class SlamNode : public rclcpp::Node
     ~SlamNode();
 
     void laserScanCallback(const LaserScan::ConstSharedPtr& msg);
+
+  private:
+    float probabilityToLogOdd(float probability);
+    float logOddToProbability(float logOdd);
+    float probToOccValue(float prob);
 }; /* class SlamNode */
 
 } /* namespace tug_turtlebot4 */
