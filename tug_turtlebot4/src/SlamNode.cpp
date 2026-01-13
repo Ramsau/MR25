@@ -28,14 +28,23 @@ SlamNode::SlamNode() :
     0.1F
   );
 
-  for (size_t row = 0; row < 3000; row++)
-  {
-    for (size_t col = 0; col < 3000; col++)
-    {
-      occupancy_grid_map_->updateCell(col, row, 50);
-    }
-    
-  }
+
+  //-100 light gray
+  // -1 light gray
+  // -0.5 blueish gray
+  // 0 blueish gray
+  // 0.5 blueish gray
+  // 1 black
+  // 50 black
+  // 100 black
+  // 200 still black
+  // for (size_t row = 0; row < 3000; row++)
+  // {
+  //   for (size_t col = 0; col < 3000; col++)
+  //   {
+  //     occupancy_grid_map_->updateCell(col, row, 0);
+  //   }
+  // }
   
 
   // TF2
@@ -75,9 +84,9 @@ void SlamNode::laserScanCallback(const LaserScan::ConstSharedPtr& msg)
       return;
     }
 
-    float prob_free = 0.9;
+    float prob_free = 0.35;
     float prob_prior = 0.5;
-    float prob_occupied = 0.1;
+    float prob_occupied = 0.9;
 
     float prob_free_l = probabilityToLogOdd(prob_free);
     float prob_prior_l = probabilityToLogOdd(prob_prior);
@@ -87,6 +96,8 @@ void SlamNode::laserScanCallback(const LaserScan::ConstSharedPtr& msg)
     //RCLCPP_INFO_STREAM(get_logger(),"prob free prob: " << logOddToProbability(prob_free_l));
 
     float prob_l = prob_prior_l;
+    float prob = prob_prior;
+    float og_prob = 0;
 
     // paint on occupancy grid map using bresenham
     // see https://de.wikipedia.org/wiki/Bresenham-Algorithmus
@@ -126,10 +137,15 @@ void SlamNode::laserScanCallback(const LaserScan::ConstSharedPtr& msg)
     err = deltafastdirection / 2;
 
     //RCLCPP_INFO_STREAM(get_logger(),"prob map: " << occupancy_grid_map_->getCell(x, y));
+    og_prob = occValueToProb(occupancy_grid_map_->getCell(x, y));
+    prob_l = probabilityToLogOdd(og_prob) + prob_free_l - prob_prior_l;
+    prob = logOddToProbability(prob_l);
 
-    prob_l = probabilityToLogOdd(occupancy_grid_map_->getCell(x, y) / 100) + prob_free_l - prob_prior_l;
-    occupancy_grid_map_->updateCell(x, y, logOddToProbability(prob_l) * 100);
-    // occupancy_grid_map_->updateCell(x, y, 100);
+    if( x == 148 && y == 139)
+      RCLCPP_INFO_STREAM(get_logger(),"Current pos Probability occupied: " << prob << " orioginal prob: " << og_prob << " x: " << x_end << " y: " << y_end);
+
+    // occupancy_grid_map_->updateCell(x, y, logOddToProbability(prob_l));
+    occupancy_grid_map_->updateCell(x, y, probToOccValue(prob));
 
 
     /* calculate pixels */
@@ -152,16 +168,30 @@ void SlamNode::laserScanCallback(const LaserScan::ConstSharedPtr& msg)
         y += pdy;
       }
 
-      prob_l = probabilityToLogOdd(occupancy_grid_map_->getCell(x, y) / 100) + prob_free_l - prob_prior_l;
-      occupancy_grid_map_->updateCell(x, y, logOddToProbability(prob_l) * 100);
+      og_prob = occValueToProb(occupancy_grid_map_->getCell(x, y));
+      prob_l = probabilityToLogOdd(og_prob) + prob_free_l - prob_prior_l;
+      prob = logOddToProbability(prob_l);
+
+      if( x == 148 && y == 139)
+        RCLCPP_INFO_STREAM(get_logger(),"Free Probability occupied: " << prob << " orioginal prob: " << og_prob << " x: " << x_end << " y: " << y_end);
+
+      occupancy_grid_map_->updateCell(x, y, probToOccValue(prob));
       // occupancy_grid_map_->updateCell(x, y, 100);
 
     }
 
     // just for reference, ill paint the actual point in -100
-    prob_l = probabilityToLogOdd(occupancy_grid_map_->getCell(x, y) / 100) + prob_occupied_l - prob_prior_l;
-    occupancy_grid_map_->updateCell(x_end, y_end, logOddToProbability(prob_l) * 100);
-    //occupancy_grid_map_->updateCell(x_end, y_end, -100);
+    og_prob = occValueToProb(occupancy_grid_map_->getCell(x_end, y_end));
+    prob_l = probabilityToLogOdd(og_prob) + prob_occupied_l - prob_prior_l;
+    prob = logOddToProbability(prob_l);
+
+    if( x_end == 148 && y_end == 139)
+    {
+      RCLCPP_INFO_STREAM(get_logger(),"Probability occupied: " << prob << " orioginal prob: " << og_prob << " x: " << x_end << " y: " << y_end);
+    }
+
+    occupancy_grid_map_->updateCell(x_end, y_end, probToOccValue(prob));
+    // occupancy_grid_map_->updateCell(x_end, y_end, -100);
 
 
     angle += msg->angle_increment;
@@ -182,7 +212,12 @@ float SlamNode::logOddToProbability(float logOdd)
 
 float SlamNode::probToOccValue(float prob)
 {
-  return -100 + 200 *prob;
+  return -1 + 2 *prob;
+}
+
+float SlamNode::occValueToProb(float occ_value)
+{
+  return 0.5 + 0.5 *occ_value;
 }
 
 } /* namespace tug_turtlebot */

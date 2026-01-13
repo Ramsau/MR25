@@ -53,6 +53,7 @@ class SlamNode : public rclcpp::Node
     float probabilityToLogOdd(float probability);
     float logOddToProbability(float logOdd);
     float probToOccValue(float prob);
+    float occValueToProb(float occ_value);
 }; /* class SlamNode */
 
 } /* namespace tug_turtlebot4 */
