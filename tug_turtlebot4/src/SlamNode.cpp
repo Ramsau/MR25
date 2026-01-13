@@ -89,9 +89,9 @@ void SlamNode::laserScanCallback(const LaserScan::ConstSharedPtr& msg)
       return;
     }
 
-    float prob_free = 0.35;
+    float prob_free = 0.4;
     float prob_prior = 0.5;
-    float prob_occupied = 0.9;
+    float prob_occupied = 0.75;
 
     float prob_free_l = probabilityToLogOdd(prob_free);
     float prob_prior_l = probabilityToLogOdd(prob_prior);
@@ -101,7 +101,7 @@ void SlamNode::laserScanCallback(const LaserScan::ConstSharedPtr& msg)
     //RCLCPP_INFO_STREAM(get_logger(),"prob free prob: " << logOddToProbability(prob_free_l));
 
     float prob_l = prob_prior_l;
-    float prob = prob_prior;
+    // float prob = prob_prior;
     float og_prob = 0;
 
     // paint on occupancy grid map using bresenham
@@ -144,13 +144,8 @@ void SlamNode::laserScanCallback(const LaserScan::ConstSharedPtr& msg)
     y = y_start;
     err = deltafastdirection / 2;
 
-    og_prob = occValueToProb(occupancy_grid_map_->getCell(x, y));
-    prob_l = probabilityToLogOdd(og_prob) + prob_free_l - prob_prior_l;
-    prob = logOddToProbability(prob_l);
-
-
-    // occupancy_grid_map_->updateCell(x, y, logOddToProbability(prob_l));
-    occupancy_grid_map_->updateCell(x, y, probToOccValue(prob));
+    prob_l = occupancy_grid_map_->getCell(x, y) + prob_free_l + prob_prior_l;
+    occupancy_grid_map_->updateCell(x, y, prob_l);
 
 
     /* calculate pixels */
@@ -173,20 +168,12 @@ void SlamNode::laserScanCallback(const LaserScan::ConstSharedPtr& msg)
         y += pdy;
       }
 
-      og_prob = occValueToProb(occupancy_grid_map_->getCell(x, y));
-      prob_l = probabilityToLogOdd(og_prob) + prob_free_l - prob_prior_l;
-      prob = logOddToProbability(prob_l);
-
-
-      occupancy_grid_map_->updateCell(x, y, probToOccValue(prob));
+      prob_l = occupancy_grid_map_->getCell(x, y) + prob_free_l + prob_prior_l;
+      occupancy_grid_map_->updateCell(x, y, prob_l);
     }
 
-    og_prob = occValueToProb(occupancy_grid_map_->getCell(x_end, y_end));
-    prob_l = probabilityToLogOdd(og_prob) + prob_occupied_l - prob_prior_l;
-    prob = logOddToProbability(prob_l);
-
-
-    occupancy_grid_map_->updateCell(x_end, y_end, probToOccValue(prob));
+    prob_l = occupancy_grid_map_->getCell(x_end, y_end) + prob_occupied_l + prob_prior_l;
+    occupancy_grid_map_->updateCell(x_end, y_end, prob_l);
 
 
     angle += msg->angle_increment;
