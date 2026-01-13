@@ -42,12 +42,18 @@ class SlamNode : public rclcpp::Node
     std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
+    // optimization
+    std::vector<float*> past_scans_;
+    rclcpp::Time last_optimize_time_ = rclcpp::Time(this->now());
+
   // Methods -------------------------------------------------------------------
   public:
     SlamNode();
     ~SlamNode();
 
     void laserScanCallback(const LaserScan::ConstSharedPtr& msg);
+    double evaluateMap();
+    void optimizeMap();
 
   private:
     float probabilityToLogOdd(float probability);

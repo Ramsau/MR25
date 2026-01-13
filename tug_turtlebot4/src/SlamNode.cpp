@@ -27,24 +27,6 @@ SlamNode::SlamNode() :
     300U,
     0.1F
   );
-
-
-  //-100 light gray
-  // -1 light gray
-  // -0.5 blueish gray
-  // 0 blueish gray
-  // 0.5 blueish gray
-  // 1 black
-  // 50 black
-  // 100 black
-  // 200 still black
-  // for (size_t row = 0; row < 3000; row++)
-  // {
-  //   for (size_t col = 0; col < 3000; col++)
-  //   {
-  //     occupancy_grid_map_->updateCell(col, row, 0);
-  //   }
-  // }
   
 
   // TF2
@@ -66,6 +48,17 @@ void SlamNode::laserScanCallback(const LaserScan::ConstSharedPtr& msg)
 {
   // map estimation
   float angle = msg->angle_min;
+
+
+  float prob_free = 0.4;
+  float prob_prior = 0.5;
+  float prob_occupied = 0.75;
+
+  float prob_free_l = probabilityToLogOdd(prob_free);
+  float prob_prior_l = probabilityToLogOdd(prob_prior);
+  float prob_occupied_l = probabilityToLogOdd(prob_occupied);
+  // i know full well that this is a memory leak, but the assignment says we should incorporate all past measurements
+  float *optimize_map = new float[300 * 300];
   for (auto range: msg->ranges) {
     if (std::isinf(range)) {
       angle += msg->angle_increment;
@@ -88,14 +81,6 @@ void SlamNode::laserScanCallback(const LaserScan::ConstSharedPtr& msg)
       RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "Could not transform point: %s", ex.what());
       return;
     }
-
-    float prob_free = 0.4;
-    float prob_prior = 0.5;
-    float prob_occupied = 0.75;
-
-    float prob_free_l = probabilityToLogOdd(prob_free);
-    float prob_prior_l = probabilityToLogOdd(prob_prior);
-    float prob_occupied_l = probabilityToLogOdd(prob_occupied);
 
     //RCLCPP_INFO_STREAM(get_logger(),"prob free log odd: " << prob_free_l);
     //RCLCPP_INFO_STREAM(get_logger(),"prob free prob: " << logOddToProbability(prob_free_l));
@@ -146,6 +131,7 @@ void SlamNode::laserScanCallback(const LaserScan::ConstSharedPtr& msg)
 
     prob_l = occupancy_grid_map_->getCell(x, y) + prob_free_l + prob_prior_l;
     occupancy_grid_map_->updateCell(x, y, prob_l);
+    optimize_map[x * 300 + y] = prob_free_l;
 
 
     /* calculate pixels */
@@ -170,13 +156,23 @@ void SlamNode::laserScanCallback(const LaserScan::ConstSharedPtr& msg)
 
       prob_l = occupancy_grid_map_->getCell(x, y) + prob_free_l + prob_prior_l;
       occupancy_grid_map_->updateCell(x, y, prob_l);
+      optimize_map[x + y * 300] = prob_free_l;
     }
 
     prob_l = occupancy_grid_map_->getCell(x_end, y_end) + prob_occupied_l + prob_prior_l;
     occupancy_grid_map_->updateCell(x_end, y_end, prob_l);
+    optimize_map[x_end + y_end * 300] = prob_occupied_l;
 
 
     angle += msg->angle_increment;
+  }
+
+  auto now = rclcpp::Time(this->now());
+  if (now - last_optimize_time_ > std::chrono::seconds(1)) {
+    // optimize
+    past_scans_.push_back(optimize_map);
+    last_optimize_time_ = now;
+    optimizeMap();
   }
 }
 
@@ -199,5 +195,31 @@ float SlamNode::occValueToProb(float occ_value)
 {
   return 0.5 + 0.5 *occ_value;
 }
+
+  void SlamNode::optimizeMap() {
+    RCLCPP_INFO(get_logger(), "optimize with %d measurements", past_scans_.size());
+    bool improved = true;
+    while (improved) {
+      improved = false;
+      for (int x = 0; x < 300U; x++) {
+        for (int y = 0; y < 300U; y++) {
+          float value = occupancy_grid_map_->getCell(x, y);
+          if (value == 0) {
+            continue;
+          }
+
+          float past_value = 0;
+          for (auto map: past_scans_) {
+            past_value += map[x + y * 300];
+          }
+          if (abs(-value - past_value) < abs(value - past_value)) {
+            occupancy_grid_map_->updateCell(x, y, -value);
+            // improved = true;
+            // RCLCPP_INFO(get_logger(), "updated cell %d %d", x, y);
+          }
+        }
+      }
+    }
+  }
 
 } /* namespace tug_turtlebot */
