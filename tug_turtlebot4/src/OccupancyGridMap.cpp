@@ -94,8 +94,10 @@ void OccupancyGridMap::updateCell(uint32_t cell_x, uint32_t cell_y, float value)
       changed = true;
     }
 
-    if (changed)
+    static rclcpp::Time last_publish_time = rclcpp::Time(node_->get_clock()->now());
+    if (node_->get_clock()->now() - last_publish_time > rclcpp::Duration::from_seconds(1.0))
     {
+      last_publish_time = node_->get_clock()->now();
       occupancy_grid_->header.stamp = node_->get_clock()->now();
       occupancy_grid_pub_->publish(*occupancy_grid_);
     }

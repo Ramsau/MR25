@@ -44,7 +44,16 @@ class SlamNode : public rclcpp::Node
 
     // optimization
     std::vector<float*> past_scans_;
-    rclcpp::Time last_optimize_time_ = rclcpp::Time(this->now());
+    std::vector<LaserScan> past_laser_scans_;
+    typedef struct {
+      double x_start;
+      double y_start;
+      // x_end and y_end are relative to x_start and y_start, not origin
+      double x_end;
+      double y_end;
+      double distance;
+    } LaserMeasurement;
+    std::vector<LaserMeasurement> past_measurements_;
 
   // Methods -------------------------------------------------------------------
   public:
@@ -53,7 +62,8 @@ class SlamNode : public rclcpp::Node
 
     void laserScanCallback(const LaserScan::ConstSharedPtr& msg);
     double evaluateMap();
-    void optimizeMap();
+    void forwardSensorModel(const LaserScan::ConstSharedPtr& msg);
+    void inverseSensorModel(const LaserScan::ConstSharedPtr& msg);
 
   private:
     float probabilityToLogOdd(float probability);
