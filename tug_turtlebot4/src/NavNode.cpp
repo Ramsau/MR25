@@ -43,18 +43,91 @@ NavNode::~NavNode()
 void NavNode::goalPoseCallback(const PoseStamped::ConstSharedPtr& goal)
 {
   // TODO: Implement reactive navigation
+
+  std::cout << "goal Pose x: " << goal->pose.position.x << std::endl;
+  std::cout << "goal Pose y: " << goal->pose.position.y << std::endl;
+  std::cout << "goal Pose z: " << goal->pose.position.z << std::endl;
+
+  std::cout << "goal Rot x: " << goal->pose.orientation.x << std::endl;
+  std::cout << "goal Rot y: " << goal->pose.orientation.y << std::endl;
+  std::cout << "goal Rot z: " << goal->pose.orientation.z << std::endl;
+  std::cout << "goal Rot w: " << goal->pose.orientation.w << std::endl;
 }
 
 // -----------------------------------------------------------------------------
 void NavNode::laserScanCallback(const LaserScan::ConstSharedPtr& scan)
 {
-  // TODO: Implement reactive navigation
+  float ci = 1;
+  float a = 10;
+  float b = 1;
+
+  int bins = 10;
+  int threshold = 500;
+
+  float mi[scan->ranges.size()];
+  float hk[bins] = {0};
+  bool hk_bin[bins];
+
+  assert(scan->ranges.size() % bins == 0);
+
+  float angle = scan->angle_min;
+  bool first_range = true;
+  for (size_t i = 0; i < scan->ranges.size(); i++) 
+  {
+    float range = scan->ranges[i];
+    // if (std::isinf(range) || first_range) 
+    // {
+    //   angle += scan->angle_increment;
+    //   first_range = false;
+    //   continue;
+    // }
+
+    mi[i] = ci * ci * (a - b * range); 
+  }
+
+  int ranges_per_bin = scan->ranges.size() / 10;
+
+  for (size_t i = 0; i < bins; i++)
+  {
+    for (size_t j = 0; j < ranges_per_bin; j++)
+    {
+      hk[i] += mi[i * ranges_per_bin + j];
+    } 
+  }
+  
+  for (size_t i = 0; i < bins; i++)
+  {
+    hk_bin[i] = hk[i] < threshold;
+  }
+
+  for (size_t i = 0; i < bins; i++)
+  {
+    std::cout << "histogram [" << i << "]: " << hk_bin[i] << " " << hk[i] << std::endl;
+  }
+
+  // get saved pose and publish cmd_vel here
+  std::cout << "last Pose x: " << last_pose.position.x << std::endl;
+  std::cout << "last Pose y: " << last_pose.position.y << std::endl;
+  std::cout << "last Pose z: " << last_pose.position.z << std::endl;
+
+  Twist test;
+
+  test.linear.x = 1;
+
+  cmd_vel_pub_->publish(test);
+  
+
+  // std::cout << "num ranges: " << scan->ranges.size() << std::endl;
 }
 
 // -----------------------------------------------------------------------------
 void NavNode::poseCallback(const Pose& pose)
 {
   // TODO: Implement reactive navigation
+
+  last_pose = pose;
+
+  // save pose for lidar update
 }
 
 } /* namespace tug_turtlebot4 */

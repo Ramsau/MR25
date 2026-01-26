@@ -32,6 +32,9 @@ class NavNode : public rclcpp::Node
     rclcpp::Subscription<LaserScan>::SharedPtr laser_scan_sub_;
     rclcpp::Subscription<PoseArray>::SharedPtr pose_sub_;
 
+    // Variables
+    Pose last_pose;
+
   // Methods -------------------------------------------------------------------
   public:
     NavNode();
