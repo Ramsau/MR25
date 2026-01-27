@@ -33,6 +33,13 @@ NavNode::NavNode()
       poseCallback(pose_array->poses[0]);
     }
   );
+
+  // TF2
+  tf_buffer_ = std::make_shared<tf2_ros::Buffer>(get_clock());
+  tf_listener_ = std::make_shared<tf2_ros::TransformListener>(
+    *tf_buffer_,
+    this
+  );
 }
 
 // -----------------------------------------------------------------------------
@@ -43,6 +50,8 @@ NavNode::~NavNode()
 void NavNode::goalPoseCallback(const PoseStamped::ConstSharedPtr& goal)
 {
   // TODO: Implement reactive navigation
+
+  goal_pose = goal->pose;
 
   std::cout << "goal Pose x: " << goal->pose.position.x << std::endl;
   std::cout << "goal Pose y: " << goal->pose.position.y << std::endl;
@@ -61,7 +70,7 @@ void NavNode::laserScanCallback(const LaserScan::ConstSharedPtr& scan)
   float a = 10;
   float b = 1;
 
-  int bins = 10;
+  int bins = 20;
   int threshold = 500;
 
   float mi[scan->ranges.size()];
@@ -71,6 +80,12 @@ void NavNode::laserScanCallback(const LaserScan::ConstSharedPtr& scan)
   assert(scan->ranges.size() % bins == 0);
 
   float angle = scan->angle_min;
+
+  std::cout << "angle min: " << angle << " angle inc: " << scan->angle_increment << std::endl;
+
+  geometry_msgs::msg::TransformStamped transform =
+            tf_buffer_->lookupTransform("rplidar_link", scan->header.frame_id, scan->header.stamp);
+
   bool first_range = true;
   for (size_t i = 0; i < scan->ranges.size(); i++) 
   {
@@ -82,10 +97,11 @@ void NavNode::laserScanCallback(const LaserScan::ConstSharedPtr& scan)
     //   continue;
     // }
 
-    mi[i] = ci * ci * (a - b * range); 
+    // mi[i] = ci * ci * (a - b * range);
+    mi[i] = range; 
   }
 
-  int ranges_per_bin = scan->ranges.size() / 10;
+  int ranges_per_bin = scan->ranges.size() / bins;
 
   for (size_t i = 0; i < bins; i++)
   {
@@ -97,7 +113,7 @@ void NavNode::laserScanCallback(const LaserScan::ConstSharedPtr& scan)
   
   for (size_t i = 0; i < bins; i++)
   {
-    hk_bin[i] = hk[i] < threshold;
+    hk_bin[i] = hk[i] > threshold;
   }
 
   for (size_t i = 0; i < bins; i++)
@@ -106,15 +122,15 @@ void NavNode::laserScanCallback(const LaserScan::ConstSharedPtr& scan)
   }
 
   // get saved pose and publish cmd_vel here
-  std::cout << "last Pose x: " << last_pose.position.x << std::endl;
-  std::cout << "last Pose y: " << last_pose.position.y << std::endl;
-  std::cout << "last Pose z: " << last_pose.position.z << std::endl;
+  // std::cout << "last Pose x: " << last_pose.position.x << std::endl;
+  // std::cout << "last Pose y: " << last_pose.position.y << std::endl;
+  // std::cout << "last Pose z: " << last_pose.position.z << std::endl;
 
   Twist test;
 
   test.linear.x = 1;
 
-  cmd_vel_pub_->publish(test);
+  //cmd_vel_pub_->publish(test);
   
 
   // std::cout << "num ranges: " << scan->ranges.size() << std::endl;

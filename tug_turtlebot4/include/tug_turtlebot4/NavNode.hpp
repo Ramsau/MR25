@@ -32,7 +32,12 @@ class NavNode : public rclcpp::Node
     rclcpp::Subscription<LaserScan>::SharedPtr laser_scan_sub_;
     rclcpp::Subscription<PoseArray>::SharedPtr pose_sub_;
 
+    // TF2
+    std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+
     // Variables
+    Pose goal_pose;
     Pose last_pose;
 
   // Methods -------------------------------------------------------------------
