@@ -32,13 +32,15 @@ class NavNode : public rclcpp::Node
     rclcpp::Subscription<LaserScan>::SharedPtr laser_scan_sub_;
     rclcpp::Subscription<PoseArray>::SharedPtr pose_sub_;
 
-    // TF2
-    std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
-    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
-
     // Variables
     Pose goal_pose;
     Pose last_pose;
+
+    double yaw_goal_pose;
+    double yaw_last_pose;
+
+    double theta_pos_goal;
+    double dist_goal;
 
   // Methods -------------------------------------------------------------------
   public:
@@ -49,6 +51,8 @@ class NavNode : public rclcpp::Node
     void goalPoseCallback(const PoseStamped::ConstSharedPtr& goal);
     void laserScanCallback(const LaserScan::ConstSharedPtr& scan);
     void poseCallback(const Pose& pose);
+
+    double yawFrowmPose(Pose pose);
 };
 
 } /* namespace tug_turtlebot4 */
