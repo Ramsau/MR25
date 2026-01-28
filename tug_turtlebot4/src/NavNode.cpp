@@ -1,5 +1,6 @@
 #include "tug_turtlebot4/NavNode.hpp"
 
+#include <complex>
 #include <functional>
 
 namespace tug_turtlebot4
@@ -11,6 +12,7 @@ NavNode::NavNode()
 {
   // Publisher
   cmd_vel_pub_ = create_publisher<Twist>("cmd_vel", 10);
+  marker_pub_ = create_publisher<MarkerArray>("marker", 10);
 
   // Subscriptions
   goal_pose_sub_ = create_subscription<PoseStamped>(
@@ -47,26 +49,20 @@ void NavNode::goalPoseCallback(const PoseStamped::ConstSharedPtr& goal)
   goal_pose = goal->pose;
 
   yaw_goal_pose = yawFrowmPose(goal_pose);
-
-  std::cout << "goal Pose x: " << goal->pose.position.x << std::endl;
-  std::cout << "goal Pose y: " << goal->pose.position.y << std::endl;
-  std::cout << "goal Pose z: " << goal->pose.position.z << std::endl;
-
-  std::cout << "goal Rot x: " << goal->pose.orientation.x << std::endl;
-  std::cout << "goal Rot y: " << goal->pose.orientation.y << std::endl;
-  std::cout << "goal Rot z: " << goal->pose.orientation.z << std::endl;
-  std::cout << "goal Rot w: " << goal->pose.orientation.w << std::endl;
 }
 
 // -----------------------------------------------------------------------------
 void NavNode::laserScanCallback(const LaserScan::ConstSharedPtr& scan)
 {
-  float ci = 1;
-  float a = 10;
-  float b = 1;
 
-  int bins = 40;
-  int threshold = 130;
+  const float ci = 1;
+  const float a = 2;
+  const float b = 0.5;
+  const int m = 6;
+
+  const int bins = 40;
+  int ranges_per_bin = scan->ranges.size() / bins;
+  int threshold = (a - b * 1.0) * ranges_per_bin;
 
   float mi[scan->ranges.size()];
   float hk[bins] = {0};
@@ -75,11 +71,8 @@ void NavNode::laserScanCallback(const LaserScan::ConstSharedPtr& scan)
 
   assert(scan->ranges.size() % bins == 0);
 
-  float angle = scan->angle_min;
-
-  // std::cout << "angle min: " << angle << " angle inc: " << scan->angle_increment << std::endl;
-
   bool first_range = true;
+  double closest_range = std::numeric_limits<float>::infinity();
   for (size_t i = 0; i < scan->ranges.size(); i++) 
   {
     float range = scan->ranges[i];
@@ -87,236 +80,127 @@ void NavNode::laserScanCallback(const LaserScan::ConstSharedPtr& scan)
     {
       // angle += scan->angle_increment;
       first_range = false;
+      // assign infinite value
+      mi[i] = std::numeric_limits<float>::quiet_NaN();
       continue;
     }
 
     mi[i] = ci * ci * (a - b * range);
-    // mi[i] = range; 
+    if (range < closest_range) closest_range = range;
   }
 
-  int ranges_per_bin = scan->ranges.size() / bins;
 
   for (size_t i = 0; i < bins; i++)
   {
     for (size_t j = 0; j < ranges_per_bin; j++)
     {
-      hk[i] += mi[i * ranges_per_bin + j];
-    } 
+      float val = mi[i * ranges_per_bin + j];
+      if (!std::isnan(val)) {
+        hk[i] += val;
+      }
+    }
   }
 
-  // rotate bins by 90° to better align with robot between index 9 and 10 is straight forawrds and 0 to 19 straight backwards
+  // rotate bins by 90° to align with robot
   for (size_t i = 0; i < bins; i++)
   {
-    hk_rot[(i + bins / 4) % bins ] = hk[i];
-    // hk_rot[i] = hk[i];
+    hk_rot[(i + bins - bins / 4) % bins ] = hk[i];
   }
-  
+
+  // threshold
   for (size_t i = 0; i < bins; i++)
   {
     hk_bin[i] = hk_rot[i] > threshold;
   }
 
-  for (size_t i = 0; i < bins; i++)
-  {
-    std::cout << "histogram [" << i << "]: " << hk_bin[i] << " " << hk_rot[i] << std::endl;
-  }
-
-  // get saved pose and publish cmd_vel here
-  // std::cout << "last Pose x: " << last_pose.position.x << std::endl;
-  // std::cout << "last Pose y: " << last_pose.position.y << std::endl;
-  // std::cout << "last Pose z: " << last_pose.position.z << std::endl;
-
-  Twist test;
-
-  test.linear.x = 1;
-  //cmd_vel_pub_->publish(test);
-
-  double yaw = yawFrowmPose(last_pose);
-
-  double total_yaw = std::fmod(yaw - theta_pos_goal + M_PI, 2 * M_PI) - M_PI;
+  double yaw_self = yawFrowmPose(last_pose);
+  double yaw_to_goal = normalizeAngle(yaw_self - theta_pos_goal);
 
   double bin_angle_inc = 2 * M_PI / bins;
+  int bin_in_goal_direction = (static_cast<int>(-yaw_to_goal / bin_angle_inc) + bins) % bins;
 
-  int bin = int((total_yaw + M_PI) / bin_angle_inc);
+  bool goal_in_valley = !hk_bin[bin_in_goal_direction];
+  int closest_valley_index = -1;
 
-  std::cout << "yaw: " << yaw << " total yaw to goal: " << total_yaw << " bin: " << bin << std::endl;
-
-  bool goal_in_valley = !hk_bin[bin];
-  
-  std::cout << "goal in valley: " << goal_in_valley << std::endl;
-  std::cout << "distance to goal: " << dist_goal << std::endl;
-
-
-  double epsilon = 0.1;
-  double epsilon_dist = 0.1;
-  double rotation_speed = 2;
-  double linear_speed = 0.5;
-
-  // if (goal_in_valley || dist_goal < epsilon_dist)
-  // {
-  //   Twist twist_cmd;
-
-  //   if (abs(total_yaw) > epsilon && dist_goal > epsilon_dist)
-  //   {
-      
-  //     rotation_speed *= abs (total_yaw / M_PI);
-
-  //     twist_cmd.angular.z = total_yaw > 0 ? rotation_speed * -1 : rotation_speed;
-
-  //     cmd_vel_pub_->publish(twist_cmd);
-  //   }
-  //   else
-  //   {
-  //     if (dist_goal > epsilon_dist)
-  //     {
-  //       twist_cmd.linear.x = dist_goal > 0.2 ? linear_speed : linear_speed * 0.5;
-  //     }
-
-  //     double goal_last_yaw_delta = yaw_goal_pose - yaw_last_pose;
-  //     std::cout << "goal yaw delta: " << goal_last_yaw_delta << " dist to goal: " << dist_goal << std::endl;
-
-  //     if (dist_goal <= epsilon_dist && abs(goal_last_yaw_delta) > epsilon)
-  //     {
-  //       rotation_speed *= abs (goal_last_yaw_delta / M_PI);
-
-  //       twist_cmd.angular.z = goal_last_yaw_delta > 0 ? rotation_speed * -1 : rotation_speed;
-  //     }      
-
-  //     cmd_vel_pub_->publish(twist_cmd);
-  //   }
-  // }
-
-  
-
-  if (!goal_in_valley)
+  // find closest sector in a valley to goal sector
+  for (size_t i = 0; i <= bins / 2; i++)
   {
-    // find closest sector in a valley to goal sector
-    int closest_valley_index = 99;
-    for (size_t i = 1; i <= bins / 2; i++)
+    if(hk_bin[(bin_in_goal_direction + i) % bins] == 0)
     {
-      if(hk_bin[(bin + i) % bins] == 0)
-      {
-        closest_valley_index = (bin + i) % bins;
-        break;
-      }
-
-      if (hk_bin[(bin - i + bins) % bins] == 0)
-      {
-        closest_valley_index = (bin - i + bins) % bins;
-        break;
-      }
+      closest_valley_index = (bin_in_goal_direction + i) % bins;
+      break;
     }
 
-    std::cout << "closest valley index: " << closest_valley_index << std::endl;
-
-    int valley_width_right = 0;
-    int valley_width_left = 0;
-    for (size_t i = 1; i <= bins / 2; i++)
+    if (hk_bin[(bin_in_goal_direction - i + bins) % bins] == 0)
     {
-      if(hk_bin[(closest_valley_index + i) % bins] == 0)
-      {
-        valley_width_right++;
-      }
-      else
-        break;
+      closest_valley_index = (bin_in_goal_direction - i + bins) % bins;
+      break;
     }
+  }
 
-    for (size_t i = 1; i <= bins / 2; i++)
+  int valley_width_right = 0;
+  int valley_width_left = 0;
+  for (size_t i = 1; i <= bins / 2; i++)
+  {
+    if(hk_bin[(closest_valley_index + i) % bins] == 0)
     {
-      if (hk_bin[(closest_valley_index - i + bins) % bins] == 0)
-      {
-        valley_width_left++;
-      }
-      else
-        break;
-    }
-
-    std::cout << "valley right: " << valley_width_right << " valley left: " << valley_width_left << std::endl;
-    assert((valley_width_left == 0 && valley_width_right > 0) || (valley_width_right == 0 && valley_width_left > 0));
-
-    int valley_width = valley_width_left > 0 ? valley_width_left : valley_width_right;
-
-    std::cout << "valley width: " << valley_width << std::endl;
-
-    int k_sol = 0;
-    int m = 2;
-
-    if (valley_width >= m)
-    {
-      if (valley_width_left > 0)
-      {
-        k_sol = (closest_valley_index - (m / 2)) % bins;
-      }
-
-      if (valley_width_right > 0)
-      {
-        k_sol = (closest_valley_index + (m / 2)) % bins;
-      }
+      valley_width_right++;
     }
     else
-    {
-      if (valley_width_left > 0)
-      {
-        k_sol = (closest_valley_index - (valley_width / 2)) % bins;
-      }
-
-      if (valley_width_right > 0)
-      {
-        k_sol = (closest_valley_index + (valley_width / 2)) % bins;
-      }
-    }
-
-    std::cout << "ksol: " << k_sol << std::endl;
-
-    double yaw_sol = k_sol * bin_angle_inc - M_PI;
-
-    total_yaw = std::fmod(yaw - yaw_sol + M_PI, 2 * M_PI) - M_PI;
-
-    std::cout << "yaw: " << yaw << " total yaw to k sol: " << total_yaw << " bin (k sol): " << k_sol << std::endl;
-
+      break;
   }
 
-  if (true)
+  for (size_t i = 1; i <= bins / 2; i++)
   {
-    Twist twist_cmd;
-
-    if (abs(total_yaw) > epsilon && dist_goal > epsilon_dist)
+    if (hk_bin[(closest_valley_index - i + bins) % bins] == 0)
     {
-      
-      rotation_speed *= abs (total_yaw / M_PI);
-
-      twist_cmd.angular.z = total_yaw > 0 ? rotation_speed * -1 : rotation_speed;
-
-      
+      valley_width_left++;
     }
     else
+      break;
+  }
+
+  int valley_width = valley_width_left > 0 ? valley_width_left : valley_width_right;
+
+  // std::cout << "valley width: " << valley_width << std::endl;
+
+  int k_sol = -1;
+  double yaw_sol = 0;
+  if (goal_in_valley) {
+    k_sol = bin_in_goal_direction;
+    yaw_sol = yaw_to_goal;
+  }
+  else if (valley_width >= m)
+  {
+    if (valley_width_left > 0)
     {
-      if (dist_goal > epsilon_dist)
-      {
-        twist_cmd.linear.x = dist_goal > 0.2 ? linear_speed : linear_speed * 0.5;
-      }
-
-      double goal_last_yaw_delta = yaw_goal_pose - yaw_last_pose;
-      std::cout << "goal yaw delta: " << goal_last_yaw_delta << " dist to goal: " << dist_goal << std::endl;
-
-      if (dist_goal <= epsilon_dist && abs(goal_last_yaw_delta) > epsilon)
-      {
-        rotation_speed *= abs (goal_last_yaw_delta / M_PI);
-
-        twist_cmd.angular.z = goal_last_yaw_delta > 0 ? rotation_speed * -1 : rotation_speed;
-      }      
+      k_sol = (closest_valley_index - (m / 2) + bins) % bins;
     }
 
-    cmd_vel_pub_->publish(twist_cmd);
+    if (valley_width_right > 0)
+    {
+      k_sol = (closest_valley_index + (m / 2) + bins) % bins;
+    }
+    yaw_sol = normalizeAngle(-k_sol * bin_angle_inc);
   }
-
-  if ((goal_pose.position.x != 0 || goal_pose.position.x != 0) && dist_goal < epsilon_dist && abs(yaw_goal_pose - yaw_last_pose) < epsilon)
+  else
   {
-    std::cout << "destination reached!!!" << std::endl;
+     if (valley_width_left > 0)
+    {
+      k_sol = (closest_valley_index - (valley_width / 2) + bins) % bins;
+    }
+
+    if (valley_width_right > 0)
+    {
+      k_sol = (closest_valley_index + (valley_width / 2) + bins) % bins;
+    }
+    yaw_sol = normalizeAngle(-k_sol * bin_angle_inc);
   }
 
+  publishCmdVel(std::min(closest_range, dist_goal), yaw_sol, yaw_goal_pose);
 
   // std::cout << "num ranges: " << scan->ranges.size() << std::endl;
+  publishMarkers(hk_rot, bins, a, b, ranges_per_bin, -yaw_to_goal, -yaw_sol, threshold, k_sol, closest_valley_index, valley_width_left, valley_width_right);
 }
 
 // -----------------------------------------------------------------------------
@@ -363,4 +247,144 @@ double NavNode::yawFrowmPose(Pose pose)
   return std::atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z));
 }
 
+void NavNode::publishMarkers(float* bins, int size, float a, float b, int ranges_per_bin, float yaw_goal_relative, float yaw_selected_relative, double threshold, int selected_bin, int closest_valley_index, int valley_width_left, int valley_width_right) {
+  visualization_msgs::msg::MarkerArray marker_array;
+
+  Marker del_marker;
+  del_marker.action = Marker::DELETEALL;
+  marker_array.markers.push_back(del_marker);
+
+  // histograms
+  for (int i = 0; i < size; i++) {
+    float angle = i * 2 * M_PI / size;
+    float length = (bins[i] / ranges_per_bin - a) / -b;
+    float x = length * std::cos(angle);
+    float y = length * std::sin(angle);
+
+    Marker marker;
+    marker.header.frame_id = "base_link";
+    marker.ns = "histogram";
+    marker.id = i;
+    marker.type = Marker::ARROW;
+    marker.action = Marker::ADD;
+    marker.scale.x = 0.02;
+    marker.scale.y = 0.05;
+    marker.color.a = 1.0;
+    marker.color.r = bins[i] > threshold ? 1.0 : 0.0;
+    marker.color.g = bins[i] > threshold ? 0.0 : 0.7;
+    if (i == selected_bin) {
+      marker.color.b = 1.0;
+    } else if (
+      ((closest_valley_index - i + size) % size <= valley_width_left) ||
+      ((i - closest_valley_index + size) % size <= valley_width_right)
+    ){
+      marker.color.b = 0.6;
+    } else {
+      marker.color.b = 0.0;
+    }
+
+    Point start;
+    start.x = 0;
+    start.y = 0;
+    start.z = 0;
+    Point end;
+    end.x = x;
+    end.y = y;
+    end.z = 0;
+    marker.points.push_back(start);
+    marker.points.push_back(end);
+    marker_array.markers.push_back(marker);
+  }
+
+  // goal yaw
+  Marker marker;
+  marker.header.frame_id = "base_link";
+  marker.ns = "goal_yaw";
+  marker.id = 0;
+  marker.type = Marker::ARROW;
+  marker.action = Marker::ADD;
+  marker.scale.x = 0.05;
+  marker.scale.y = 0.2;
+  marker.color.a = 1.0;
+  marker.color.r = 1.0;
+  marker.color.g = 0.0;
+  marker.color.b = 1.0;
+  Point start;
+  start.x = 0;
+  start.y = 0;
+  start.z = 0;
+  Point end;
+  end.x = 0.5 * std::cos(yaw_goal_relative);
+  end.y = 0.5 * std::sin(yaw_goal_relative);
+  end.z = 0;
+  marker.points.push_back(start);
+  marker.points.push_back(end);
+  marker_array.markers.push_back(marker);
+
+  // selected yaw
+  Marker marker_sel;
+  marker_sel.header.frame_id = "base_link";
+  marker_sel.ns = "goal_yaw";
+  marker_sel.id = 1;
+  marker_sel.type = Marker::ARROW;
+  marker_sel.action = Marker::ADD;
+  marker_sel.scale.x = 0.05;
+  marker_sel.scale.y = 0.2;
+  marker_sel.color.a = 1.0;
+  marker_sel.color.r = 0.0;
+  marker_sel.color.g = 1.0;
+  marker_sel.color.b = 1.0;
+  Point start_sel;
+  start_sel.x = 0;
+  start_sel.y = 0;
+  start_sel.z = 0;
+  Point end_sel;
+  end_sel.x= 0.5 * std::cos(yaw_selected_relative);
+  end_sel.y= 0.5 * std::sin(yaw_selected_relative);
+  end_sel.z= 0;
+  marker_sel.points.push_back(start_sel);
+  marker_sel.points.push_back(end_sel);
+  marker_array.markers.push_back(marker_sel);
+
+  marker_pub_->publish(marker_array);
+}
+
+double NavNode::normalizeAngle(double angle) {
+  angle = fmod(angle + M_PI, 2 * M_PI);
+  if (angle < 0) {
+    angle += 2 * M_PI;
+  }
+  return angle - M_PI;
+}
+
+void NavNode::publishCmdVel(double dist_to_goal, double yaw_to_goal, double final_yaw) {
+  double epsilon_theta = 0.1;
+  double max_yaw_delta_while_moving = M_PI / 4;
+  double epsilon_dist = 0.1;
+  double rotation_speed = 0.8;
+  double linear_speed = 0.8;
+
+  double yaw_goal_delta = normalizeAngle(final_yaw - yaw_last_pose);
+  static bool destination_reached = false;
+
+  Twist twist_cmd;
+  if (dist_to_goal > epsilon_dist) {
+    destination_reached = false;
+    twist_cmd.angular.z = -rotation_speed * yaw_to_goal / M_2_PI;
+    if (std::abs(yaw_to_goal) < std::abs(max_yaw_delta_while_moving)) {
+      twist_cmd.linear.x = std::min(linear_speed, linear_speed * dist_to_goal);
+    }
+  } else if (std::abs(yaw_goal_delta) > epsilon_theta) {
+    destination_reached = false;
+    twist_cmd.angular.z =  rotation_speed * yaw_goal_delta / M_2_PI;
+  }
+  else if (!destination_reached)
+  {
+    std::cout << "destination reached!!!" << std::endl;
+    destination_reached = true;
+  }
+  cmd_vel_pub_->publish(twist_cmd);
+
+
+}
 } /* namespace tug_turtlebot4 */

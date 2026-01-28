@@ -17,6 +17,7 @@ find_package(nav_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(tug_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 #find ignition dependencies
 find_package(ignition-gazebo6 REQUIRED)
@@ -42,6 +43,7 @@ ament_target_dependencies(
     rclcpp
     geometry_msgs
     sensor_msgs
+    visualization_msgs
 )
 
 add_executable(simple_turtle "src/simple_turtle.cpp" "src/SimpleTurtleNode.cpp")
